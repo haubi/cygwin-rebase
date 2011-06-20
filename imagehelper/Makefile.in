@@ -1,0 +1,77 @@
+RELEASE=0.8
+
+CXXFLAGS=-O2  $(CXXFLAGS_OPT)
+LDFLAGS=$(LDFLAGS_OPT)
+
+#
+# imagehelper library 
+#
+LIB_TARGET=imagehelper 
+LIB_TARGET_FILE=libimagehelper.a 
+LIB_FILES=objectfile.o objectfilelist.o sections.o debug.o \
+	rebaseimage.o checkimage.o fiximage.o getimageinfos.o \
+	bindimage.o
+
+#
+# applications
+#
+REBASE_TARGET=rebase
+REBASE_FILES=rebase_main.o version.o $(LIB_TARGET_FILE)
+
+REBIND_TARGET=rebind
+REBIND_FILES=rebind_main.o version.o $(LIB_TARGET_FILE)
+
+UNBIND_TARGET=unbind
+UNBIND_FILES=unbind_main.o version.o $(LIB_TARGET_FILE)
+
+#
+# all targets 
+#
+TARGETS=$(REBASE_TARGET) $(REBIND_TARGET) $(UNBIND_TARGET)
+
+all: $(LIB_TARGET) $(TARGETS)
+
+$(LIB_TARGET): $(LIB_TARGET_FILE)
+
+$(LIB_TARGET_FILE): $(LIB_FILES) 
+	ar -cru $@ $^
+
+$(REBASE_TARGET): $(REBASE_FILES)
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
+
+
+$(REBIND_TARGET): $(REBIND_FILES)
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
+
+$(UNBIND_TARGET): $(UNBIND_FILES)
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
+
+version.c: 	Makefile.in 
+	echo "float release = $(RELEASE); " >version.c 
+
+	
+install: $(TARGETS)
+	/usr/bin/install $^ /usr/local/bin
+	/usr/bin/install -d /usr/doc/rebase-$(RELEASE)
+	/usr/bin/install README INSTALL /usr/doc/rebase-$(RELEASE)
+	
+clean: 
+	rm -f *.o *.dll *.exe *.bak *.stackdump *.bz2 version.c *.orig *.doxygen *.a
+	
+
+indent: 
+	astyle --style=gnu -s2 --convert-tabs *.cc *.h
+
+doc:
+	cat rebase.doxygen.in | sed "s~@VERSION@~$(RELEASE)~g" >rebase.doxygen
+	doxygen rebase.doxygen
+
+srcdist: 
+	@make clean
+	@cd .. && tar -cjvf rebase-$(RELEASE)-src.tar.bz2 rebase/*
+	@echo "archive '`cygpath -aw $rebase-$(RELEASE)-src.tar.bz2`' created"
+	
+bindist: 
+	cd / && tar -cjvf /tmp/rebase-$(RELEASE).tar.bz2 /usr/local/bin/rebase.exe /usr/doc/rebase-$(RELEASE)
+	mv /tmp/rebase-$(RELEASE).tar.bz2 .
+	

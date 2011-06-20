@@ -1,0 +1,63 @@
+README
+
+
+This is a mostly complete rewrite of the win api function RebaseImage() 
+for changing the base address of win32 dll's. 
+The rebasing is done by changing the ImageBase field in the image header 
+and relocating all available relocations found in the .reloc section of 
+the image. 
+
+The main reasons for this rewrite are, that 
+1. WinMe does not support the RebaseImage() 
+2. the recent binutils strip command corrupts dll's linked with debugging informations. 
+
+Please send questions and notes relating to this application to the kde-cygwin mailing list. 
+See http://cygwin.kde.org for more informations. 
+
+
+History
+=======
+
+0.7
+=====
+- renamed library to imagehelper 
+- added mingw support
+
+0.6
+===
+- creates a static lib containing all needed objectfiles for RebaseImage() and friends. 
+  The library is named libimagehlp.a and the relating include file imagehlp.h. 
+
+- the debug message printing is conditionalized with an internal debug flag, 
+  so by default the code does not print any debug messages. 
+
+0.5
+===
+improvements 
+- make more compatible MMS's rebase (Jason Tishler) 
+
+0.4
+===
+improvements 
+- added relocation validation check 
+- added fixing bad relocations
+
+0.3
+===
+some improvements 
+- added rebasing for all available sections 
+- added relocation validation check to -l command 
+
+0.2 
+===
+- basic rewrite by Ralf Habacker 
+
+- added rebasing for all available sections 
+- added relocation validation check to -l command 
+
+0.1 
+- initial release by Jason Tishler 
+
+
+Ralf Habacker
+ 

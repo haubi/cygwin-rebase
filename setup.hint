@@ -1,0 +1,6 @@
+# $Id$
+sdesc: "utilities for rebasing DLLs to load at alternate addresses"
+ldesc: "This package contains the Cygwin rebase utilities.  Use rebase for
+specific DLLs or rebaseall for all DLLs installed by Cygwin's setup.exe."
+category: System Utils Base
+requires: dash cygwin coreutils grep gzip sed

@@ -1,0 +1,9 @@
+#
+# CYGWIN flags 
+#
+CXXFLAGS_OPT= 
+LDFLAGS_OPT=
+SYSTEM=cygwin
+
+include Makefile.in
+

@@ -1,0 +1,34 @@
+INSTALLATION
+============
+
+Compiling 
+---------
+
+Currently compiling and installing needs the cygwin environment, targets are cygwi nand mingw 
+
+compiling for cygwin 
+
+	$ make -f Makefile.cygwin 
+
+compiling for mingw 
+
+	$ make -f Makefile.mingw 
+
+
+installing
+
+	make -f Makefile.[cygwin|mingw] install 
+
+
+Unpack this archive in the cygwin root tree. It will install the rebase executable in /usr/local/bin
+
+rebase has some options. See below: 
+
+$ rebase
+rebase Release: 0.4
+usage: rebase [-D] -b BaseAddress [-d] -o Offset <file> ...  rebase <file>  ([-D] print debug infos)
+usage: rebase [-D] -l <file> ...        list Imagebase and -size of <file>
+usage: rebase [-D] -c                   check relocations
+usage: rebase [-D] -f                   fix bad relocations
+
+
