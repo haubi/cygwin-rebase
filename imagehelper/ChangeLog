@@ -1,4 +1,21 @@
-2010-06-02  Charles Wilson  <...>
+2011-06-20  Charles Wilson  <cygwin@cwilson.fastmail.fm>
+
+	Convert to unix format. Update documentation. Add .cvsignore.
+	* .cvsignore: New.
+	* README: Convert from dos to unix format. Add entries for
+	lib_version 0.8 and 0.9.
+	* bindimage.cc: Convert from dos to unix format.
+	* checkimage.cc: Ditto.
+	* debug.cc: Ditto.
+	* fiximage.cc: Ditto.
+	* getimageinfos.cc: Ditto.
+	* imagehelper.h: Ditto.
+	* objectfile.h: Ditto.
+	* objectfilelist.cc: Ditto.
+	* objectfilelist.h: Ditto.
+	* rebaseimage.cc: Ditto.
+
+2011-06-20  Charles Wilson  <cygwin@cwilson.fastmail.fm>
 
 	Use autoconf. Treat as intrinsic part of rebase package,
 	rather than almost-but-not-really independent. Correct
