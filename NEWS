@@ -1,60 +1,17 @@
 $Id$
 
-2.4:
-===
-The following are the changes to rebaseall:
+3.0.2
+==============================================================================
+    * Autoconfify. Silence build warnings. Add support for building (natively,
+      for each platform) on mingw, msys, and cygwin. Support dash/ash usage.
+      Add workaround for broken getopt_long on MSYS.
 
-    * Change to exit with rebase's exit code instead of unconditionally
-      exiting with zero (Axel Naumann).
-    * Convert from bash to ash script.
-    * Remove obsolete Apache hack.
-    * Add support for spaces in file and directory paths.
-    * Add rebasing of .so files too.
-    * Add suffix option (i.e., -s) to support rebasing of DLLs with
-      non-standard extensions.
-    * Add support to verify that only ash processes are running or exit.
-
-2.4.1:
-=====
-The following are the changes to rebaseall:
-
-    * Change the "only ash processes are running" check to support 9X/Me.
-    * Add setting PATH to support environments that do not have Cygwin's bin
-      in the Windows' system PATH.
-
-2.4.2:
-=====
-The following are the changes to rebaseall:
-
-    * Change zcat to "gzip -d -c" and egrep to "grep -E" to avoid the possibly
-      of invoking a (bash) shell script.
-
-2.4.3:
-=====
-The following are the changes to rebaseall:
-
-    * Changes to support Cygwin's CYGWIN=transparent_exe option.
-
-2.4.4:
-=====
-    * Change rebaseall to prevent "Argument list too long" errors as
-      reported in:
-
-      http://www.cygwin.com/ml/cygwin/2005-09/msg00836.html
-
-    * Change rebase to use modern method to find the image's
-      IMAGE_NT_SIGNATURE as suggested in:
-    
-      http://www.cygwin.com/ml/cygwin/2006-02/msg00645.html
-
-    * Change imagehelper library so it compiles under gcc 3.4.x
-      (and hopefully later) as suggested in an email from Jens Dill.
-
-    * Change rebaseall to use a tighter regular expression when
-      creating the rebase list.
+3.0.1
+==============================================================================
+    * Placeholder.
 
 3.0:
-====
+==============================================================================
     * New peflags utility allows to manipulate the following
       flags in DLLs:
            peflags [OPTIONS] [-T filelist | -] file(s)...
@@ -81,3 +38,57 @@ The following are the changes to rebaseall:
 The following are the changes to rebaseall:
 
     * Exclude cyglsa64.dll from rebase list
+
+2.4.4:
+==============================================================================
+    * Change rebaseall to prevent "Argument list too long" errors as
+      reported in:
+
+      http://www.cygwin.com/ml/cygwin/2005-09/msg00836.html
+
+    * Change rebase to use modern method to find the image's
+      IMAGE_NT_SIGNATURE as suggested in:
+    
+      http://www.cygwin.com/ml/cygwin/2006-02/msg00645.html
+
+    * Change imagehelper library so it compiles under gcc 3.4.x
+      (and hopefully later) as suggested in an email from Jens Dill.
+
+    * Change rebaseall to use a tighter regular expression when
+      creating the rebase list.
+
+2.4.3:
+==============================================================================
+The following are the changes to rebaseall:
+
+    * Changes to support Cygwin's CYGWIN=transparent_exe option.
+
+2.4.2:
+==============================================================================
+The following are the changes to rebaseall:
+
+    * Change zcat to "gzip -d -c" and egrep to "grep -E" to avoid the possibly
+      of invoking a (bash) shell script.
+
+2.4.1:
+==============================================================================
+The following are the changes to rebaseall:
+
+    * Change the "only ash processes are running" check to support 9X/Me.
+    * Add setting PATH to support environments that do not have Cygwin's bin
+      in the Windows' system PATH.
+
+2.4:
+==============================================================================
+The following are the changes to rebaseall:
+
+    * Change to exit with rebase's exit code instead of unconditionally
+      exiting with zero (Axel Naumann).
+    * Convert from bash to ash script.
+    * Remove obsolete Apache hack.
+    * Add support for spaces in file and directory paths.
+    * Add rebasing of .so files too.
+    * Add suffix option (i.e., -s) to support rebasing of DLLs with
+      non-standard extensions.
+    * Add support to verify that only ash processes are running or exit.
+

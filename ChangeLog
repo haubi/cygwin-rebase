@@ -1,4 +1,10 @@
-2010-06-02  Charles Wilson  <...>
+2011-06-20  Charles Wilson  <cygwin@cwilson.fastmail.fm>
+
+	Update documentation. Add .cvsignore.
+	* .cvsignore: New.
+	* NEWS: Reorganize into standard newest-first format.
+
+2011-06-20  Charles Wilson  <cygwin@cwilson.fastmail.fm>
 
 	Use autoconf. Configurable installation and SHELL.
 
