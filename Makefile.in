@@ -1,0 +1,185 @@
+# $Id$
+# @configure_input@
+# Makefile for rebase
+
+@SET_MAKE@
+
+PACKAGE_BUGREPORT = @PACKAGE_BUGREPORT@
+PACKAGE_NAME = @PACKAGE_NAME@
+PACKAGE_STRING = @PACKAGE_STRING@
+PACKAGE_TARNAME = @PACKAGE_TARNAME@
+PACKAGE_URL = @PACKAGE_URL@
+PACKAGE_VERSION = @PACKAGE_VERSION@
+LIB_VERSION = $(shell $(FGREP) LIB_VERSION= $(srcdir)/imagehelper/Makefile.in|$(EGREP) -o '[0-9.]+')
+
+srcdir = @srcdir@
+abs_srcdir = @abs_srcdir@
+top_srcdir = @top_srcdir@
+abs_top_srcdir = @abs_top_srcdir@
+builddir = @builddir@
+abs_builddir = @abs_builddir@
+top_builddir = @top_builddir@
+abs_top_builddir = @abs_top_builddir@
+
+VPATH = $(srcdir)
+
+prefix = @prefix@
+exec_prefix = @exec_prefix@
+bindir = @bindir@
+datarootdir = @datarootdir@
+sysconfdir = @sysconfdir@
+localstatedir = @localstatedir@
+docdir = @docdir@
+OBJEXT = @OBJEXT@
+EXEEXT = @EXEEXT@
+O = $(OBJEXT)
+LIBOBJDIR =
+LIBOBJS = @LIBOBJS@
+DESTDIR =
+
+CC = @CC@
+CFLAGS = @CFLAGS@
+CPPFLAGS = @CPPFLAGS@
+CXX = @CXX@
+CXXFLAGS = @CXXFLAGS@
+LDFLAGS = @LDFLAGS@
+INSTALL = @INSTALL@
+INSTALL_DATA = @INSTALL_DATA@
+INSTALL_PROGRAM = @INSTALL_PROGRAM@
+INSTALL_SCRIPT = @INSTALL_SCRIPT@
+MKDIR_P = @MKDIR_P@
+LN_S = @LN_S@
+SED = @SED@
+EGREP = @EGREP@
+FGREP = @FGREP@
+ASH = @ASH@
+
+DEFAULT_INCLUDES = -I. -I$(srcdir) -I$(srcdir)/imagehelper
+DEFS = @DEFS@ -DVERSION='"$(PACKAGE_VERSION)"' -DLIB_VERSION='"$(LIB_VERSION)"'
+
+.SUFFIXES:
+.SUFFIXES: .c .cc .$(O)
+
+%.$(O) : %.cc
+	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(CPPFLAGS) $(CXXFLAGS) -o $@ -c $<
+
+%.$(O) : %.c
+	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(CPPFLAGS) $(CFLAGS) -o $@ -c $<
+
+LIBIMAGEHELPER = imagehelper/libimagehelper.a
+
+REBASE_OBJS = rebase.$(O) $(LIBOBJS)
+REBASE_LIBS = $(LIBIMAGEHELPER)
+
+PEFLAGS_OBJS = peflags.$(O) $(LIBOBJS)
+PEFLAGS_LIBS =
+
+SRC_DISTFILES = aclocal.m4 configure.ac configure Makefile.in \
+	peflagsall.in rebaseall.in peflags.c rebase.c \
+	build.sh ChangeLog COPYING NEWS README setup.hint Todo \
+	build-aux/config.guess build-aux/config.sub \
+	build-aux/install-sh getopt.h_ getopt_long.c
+
+all: rebase$(EXEEXT) peflags$(EXEEXT) rebaseall peflagsall
+
+$(LIBIMAGEHELPER):
+	$(MAKE) -C imagehelper imagehelper
+
+rebase$(EXEEXT): $(REBASE_LIBS) $(REBASE_OBJS)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $(REBASE_OBJS) $(REBASE_LIBS)
+
+rebase.$(O):: rebase.c Makefile
+
+peflags$(EXEEXT): $(PEFLAGS_OBJS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(PEFLAGS_OBJS)
+
+peflags.$(O):: peflags.c Makefile
+
+getopt.h: getopt.h_
+	cp $^ $@
+
+getopt_long.$(O):: getopt_long.c getopt.h
+
+# Autoconf manual says "do not use AC_CONFIG_FILES to replace
+# bindir and friends in your shell scripts"
+edit = sed \
+	-e 's|@bindir[@]|$(bindir)|g' \
+	-e 's|@pkgdatadir[@]|$(pkgdatadir)|g' \
+	-e 's|@prefix[@]|$(prefix)|g' \
+	-e 's|@exec_prefix[@]|$(exec_prefix)|g' \
+	-e 's|@ASH[@]|$(ASH)|g'
+
+rebaseall peflagsall: Makefile
+	rm -f $@ $@.tmp
+	srcdir=''; \
+	test -f ./$@.in || srcdir=$(srcdir)/; \
+	$(edit) $${srcdir}$@.in >$@.tmp
+	chmod +x $@.tmp
+	chmod a-w $@.tmp
+	mv $@.tmp $@
+
+rebaseall: rebaseall.in
+peflagsall: peflagsall.in
+
+install: all
+	$(MKDIR_P) $(DESTDIR)$(bindir)
+	$(INSTALL_PROGRAM) -s rebase$(EXEEXT) $(DESTDIR)$(bindir)
+	$(INSTALL_PROGRAM) -s peflags$(EXEEXT) $(DESTDIR)$(bindir)
+	$(INSTALL_SCRIPT) rebaseall $(DESTDIR)$(bindir)
+	$(INSTALL_SCRIPT) peflagsall $(DESTDIR)$(bindir)
+	$(MKDIR_P) $(DESTDIR)$(docdir)
+	$(INSTALL_DATA) $(srcdir)/README $(DESTDIR)$(docdir)
+	$(INSTALL_DATA) $(srcdir)/NEWS $(DESTDIR)$(docdir)
+	$(INSTALL_DATA) $(srcdir)/ToDo $(DESTDIR)$(docdir)
+	$(INSTALL_DATA) $(srcdir)/COPYING $(DESTDIR)$(docdir)
+
+# The source distribution is created by replicating the distributable
+# files from our working source directory, into an appropriately named
+# local directory, and packaging that.
+
+MK_TAR = tar chf -
+ZIPCMD = bzip2 -c
+ZIPEXT = tar.bz2
+SRC_DISTDIR = $(PACKAGE_TARNAME)-$(PACKAGE_VERSION)
+
+srcdistdir:
+	rm -rf $(abs_top_builddir)/$(SRC_DISTDIR)
+	mkdir $(abs_top_builddir)/$(SRC_DISTDIR)
+
+subdir-srcdist-prepare:
+	make -C imagehelper srcdist-prepare SRC_DISTDIR=$(SRC_DISTDIR)
+
+srcdist-prepare: srcdistdir subdir-srcdist-prepare
+	cd $(SRC_DISTDIR); \
+	for file in $(SRC_DISTFILES); do \
+	  case "$$file" in \
+	  */* ) test -d $(abs_top_builddir)/$(SRC_DISTDIR)/$${file%/*} || \
+		  $(MKDIR_P) $(abs_top_builddir)/$(SRC_DISTDIR)/$${file%/*} ;\
+	        (cd $(abs_top_builddir)/$(SRC_DISTDIR)/$${file%/*} && \
+		  $(LN_S) $(abs_srcdir)/$$file .) ;; \
+	  * ) $(LN_S) $(abs_srcdir)/$$file . ;;\
+	  esac;\
+	done
+
+srcdist: srcdist-prepare
+	$(MK_TAR) $(SRC_DISTDIR) | $(ZIPCMD) > $(SRC_DISTDIR).$(ZIPEXT)
+	rm -rf $(SRC_DISTDIR)
+
+dist: srcdist
+
+.PHONY: clean
+clean:
+	$(RM) *.$(O) rebase$(EXEEXT) peflags$(EXEEXT) *.tmp 
+	$(RM) rebaseall peflagsall
+
+.PHONY: realclean
+realclean: clean
+	$(MAKE) -C imagehelper clean
+
+.PHONY: distclean
+distclean: realclean
+	$(RM) config.log config.cache config.status
+	$(RM) -r autom4te.cache
+	$(MAKE) -C imagehelper distclean
+	$(RM) Makefile
+
