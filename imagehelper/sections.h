@@ -83,8 +83,8 @@ class Section : public SectionBase
   {
   public:
     Section(void *FileBase, SectionHeader *p);
-    void debugprint(char *title = "");
-    void print(char *title = "");
+    void debugprint(const char *title = "");
+    void print(const char *title = "");
     bool isIn(Section &in);
     bool isIn(uint addr);
     char *getName(void)
@@ -125,7 +125,7 @@ class SectionList : public Base
     ~SectionList();
     bool add
       (Section *asection);
-    Section *find(char *name);
+    Section *find(const char *name);
     Section *find(uint address);
 
     // reset iterator
@@ -186,7 +186,7 @@ class Relocations : SectionBase
   {
   public:
     // create a relocation object using section named "section" from  the section list "sections"
-    Relocations(SectionList &sectionList, char *sectionName);
+    Relocations(SectionList &sectionList, const char *sectionName);
 
     // check for bad relocations
     bool check(void);

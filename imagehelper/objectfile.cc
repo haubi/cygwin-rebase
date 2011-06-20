@@ -27,19 +27,28 @@
 
 // read a dll into the cache
 
-#ifdef __CYGWIN__
+#if defined(__CYGWIN__) || defined(__MSYS__)
 #include <sys/cygwin.h>
 #endif
 
-#ifdef __CYGWIN__
+#if defined(__CYGWIN__) || defined(__MSYS__)
 
 static char * Win32Path(char * s)
 {
-  char buf[MAX_PATH];
   if (!s || *s == '\0')
-    return "";
-  cygwin_conv_to_win32_path(s, buf);
-  return strdup(buf);
+    return strdup("");
+#if defined(HAVE_DECL_CYGWIN_CONV_PATH) && HAVE_DECL_CYGWIN_CONV_PATH
+  {
+    char * r = (char *)cygwin_create_path (CCP_POSIX_TO_WIN_A, s);
+	return (r ? r : strdup(""));
+  }
+#else
+  {
+    char buf[MAX_PATH];
+    cygwin_conv_to_win32_path(s, buf);
+    return strdup(buf);
+  }
+#endif
 }
 #else
 #define Win32Path(s)  s
@@ -318,7 +327,7 @@ bool LinkedObjectFile::PrintDependencies(ObjectFileList &cache)
 
   imports->reset();
 
-  char *filler="                                                          ";
+  const char *filler="                                                          ";
 
   if (!isPrinted)
     {

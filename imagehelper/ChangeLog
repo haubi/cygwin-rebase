@@ -1,67 +1,89 @@
+2010-06-02  Charles Wilson  <...>
+
+	Use autoconf. Treat as intrinsic part of rebase package,
+	rather than almost-but-not-really independent. Correct
+	gcc warnings.
+
+	* ChangeLog: Fix whitespace and formatting.
+	* INSTALL: Removed.
+	* Makefile: Removed.
+	* Makefile.cygwin: Removed.
+	* Makefile.mingw: Removed.
+	* Makefile.in: Rewrite for autoconf. Bump library version
+	due to changes below.
+	* rebase.h: Removed unused file.
+	* sections.cc: Silence gcc warnings.
+	* sections.h: Silence gcc warnings.
+	* objectfile.cc: Use cygwin_create_path() when available.
+	Accomodate MSYS.
+	* rebase_main.cc: Ditto.
+	* rebind_main.cc: Ditto.
+	* unbind_main.cc: Ditto.
+
 2003-02-17  Jason Tishler <jason@tishler.net>
-						
-	*	rebaseimage.cc (RebaseImage): Fixes bug when rebasing up 
+
+	* rebaseimage.cc (RebaseImage): Fixes bug when rebasing up
 	and the DLL is already based at the requested address.
 
 2003-02-14  Ralf Habacker <ralf.habacker@freenet.de>
-						Jason Tishler <jason@tishler.net>
-						
-	*	sections.h (debugprint): 	New prototype.
-	*	sections.cc (debugprint): New function.
-	(Relocations::check): added additional debug printing, 
+            Jason Tishler <jason@tishler.net>
+
+	* sections.h (debugprint): New prototype.
+	* sections.cc (debugprint): New function.
+	(Relocations::check): added additional debug printing,
 	 changed endpointer comparing.
 	(Relocations::fix): Changed endpointer comparing.
 	(Relocations::relocate): Ditto.
-		
+
 2003-01-31  Jason Tishler <jason@tishler.net>
 
-  * rebaseimage.cc: fixed bug in dll base address adjustment.
+	* rebaseimage.cc: fixed bug in dll base address adjustment.
 
 2003-01-21  Jason Tishler <jason@tishler.net>
 
-  * imagehelper.h, rebaseimage.cc: added c support 
-  for function prototypes. 
+	* imagehelper.h, rebaseimage.cc: added c support
+	for function prototypes.
 
 2003-01-04  Ralf Habacker  <Ralf.habacker@freenet.de>
 
-  * sections.h: added classes BoundImportDescriptor
-  and DataDirectory 
-  * objectfile.cc,sections.cc: used class ImageDescriptor,
-  BoundImageDescriptor and DataDirectory instead of 
-  native windows definitions. 
-  
-2003-01-04  Ralf Habacker  <Ralf.habacker@freenet.de>
-
-  * rebase.doxygen.in: removed inlining sources 
+	* sections.h: added classes BoundImportDescriptor
+	and DataDirectory
+	* objectfile.cc,sections.cc: used class ImageDescriptor,
+	BoundImageDescriptor and DataDirectory instead of
+	native windows definitions.
 
 2003-01-04  Ralf Habacker  <Ralf.habacker@freenet.de>
 
-  * section.cc (Relocations::relocate): fix return code 
-  problems.
+	* rebase.doxygen.in: removed inlining sources
 
 2003-01-04  Ralf Habacker  <Ralf.habacker@freenet.de>
 
-  * section.h (class Imports): derivate from SectionBase 
-  to avoid duplicate getAdjust() method.
-  
+	* section.cc (Relocations::relocate): fix return code
+	problems.
+
+2003-01-04  Ralf Habacker  <Ralf.habacker@freenet.de>
+
+	* section.h (class Imports): derivate from SectionBase
+	to avoid duplicate getAdjust() method.
+
 2003-01-03  Ralf Habacker  <Ralf.habacker@freenet.de>
 
-  * objectfile.cc,sections.cc,unbind_main,bindimage.cc,
-  checkimage.cc,fiximage.cc,getimageinfos.cc,rebaseimage.cc,
-  unbind_main.cc: completed debug message printing to cerr 
-  and regular output to cout.
-  
+	* objectfile.cc,sections.cc,unbind_main,bindimage.cc,
+	checkimage.cc,fiximage.cc,getimageinfos.cc,rebaseimage.cc,
+	unbind_main.cc: completed debug message printing to cerr
+	and regular output to cout.
+
 2003-01-03  Ralf Habacker  <Ralf.habacker@freenet.de>
 
-  * objectfile.cc,sections.cc: added conditional printing 
-  for debug messages.
+	* objectfile.cc,sections.cc: added conditional printing
+	for debug messages.
 
 2003-01-03  Charles Wilson  <cwilson@ece.gatech.edu>
 
-  * Makefile: spelling corrected, moved to unix eol.
-  * README, ChangeLog: moved to unix eol.
-  * rebase.doxygen.in: used new name imagehelper. 
-   
+	* Makefile: spelling corrected, moved to unix eol.
+	* README, ChangeLog: moved to unix eol.
+	* rebase.doxygen.in: used new name imagehelper.
+
 2003-01-02  Charles Wilson  <cwilson@ece.gatech.edu>
 
 	* Makefile.in: add bindimage.o to LIBFILES
@@ -102,27 +124,27 @@
 
 2003-01-02 Ralf Habacker <Ralf.Habacker@freenet.de>
 
-	* Makefile: new file 
+	* Makefile: new file
 
 2003-01-02 18:05  Ralf Habacker <Ralf.Habacker@freenet.de>
 
-	* INSTALL: new file.  
-	* Makefile: moved to Makefile.in. 
-	* Makefile.in: new file. 
-	* Makefile.mingw, Makefile.cygwin, objectfile.cc, 
-	rebase_main.cc, rebind_main.cc,unbind_main.cc: 
+	* INSTALL: new file.
+	* Makefile: moved to Makefile.in.
+	* Makefile.in: new file.
+	* Makefile.mingw, Makefile.cygwin, objectfile.cc,
+	rebase_main.cc, rebind_main.cc,unbind_main.cc:
 		added mingw support
 
 2003-01-02 16:32  Ralf Habacker <Ralf.Habacker@freenet.de>
 
-	* Makefile (clean): added deleting *.a files 
+	* Makefile (clean): added deleting *.a files
 
 2003-01-02 16:30  Ralf Habacker <Ralf.Habacker@freenet.de>
 
 	* imagehelper.h: renamed from imagehlp.h
-	* debug.cc: renamed from imagehlpdebug.cc 
+	* debug.cc: renamed from imagehlpdebug.cc
 	* imagehlp.h: deleted
-	* imagehlpdebug.cc: deleted 
+	* imagehlpdebug.cc: deleted
 	* checkimage.cc, debug.cc, fiximage.cc, getimageinfos.cc,
 	rebase_main.cc,Makefile: patched for new library name imagehelper
 

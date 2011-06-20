@@ -37,7 +37,7 @@ Section::Section(void *aFileBase, SectionHeader *p)
 
 // FIXME: should be print() with returning ostream, but this isn't supported with gcc 2.
 
-void Section::debugprint(char *title)
+void Section::debugprint(const char *title)
 {
   std::cerr << std::setw(10) << std::setfill(' ') << title \
   << " name: " << std::setw(8) << std::setfill(' ') << Name \
@@ -47,7 +47,7 @@ void Section::debugprint(char *title)
   << " offset: 0x" << std::setw(8) << std::setfill('0') << std::hex << adjust << std::dec << std::endl;
 }
 
-void Section::print(char *title)
+void Section::print(const char *title)
 {
   std::cout << std::setw(10) << std::setfill(' ') << title \
   << " name: " << std::setw(8) << std::setfill(' ') << Name \
@@ -90,7 +90,7 @@ SectionList::~SectionList()
     delete sections[i];
 }
 
-Section *SectionList::find(char *name)
+Section *SectionList::find(const char *name)
 {
   for (int i = 0; i < count; i++)
     {
@@ -258,7 +258,7 @@ void Imports::dump(char *title)
 //----- class Imports --------------------------------------------------
 
 
-Relocations::Relocations(SectionList &sectionList, char *sectionName)
+Relocations::Relocations(SectionList &sectionList, const char *sectionName)
 {
   sections = &sectionList;
   Section *asection = sections->find(sectionName);

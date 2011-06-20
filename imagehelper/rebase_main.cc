@@ -117,13 +117,25 @@ main(int argc, char* argv[])
 
   exit(0);
 }
-#ifdef __CYGWIN__
+#if defined(__CYGWIN__) || defined(__MSYS__)
 string
 PosixToWin32(const string& aPosixPath)
 {
+#if defined(HAVE_DECL_CYGWIN_CONV_PATH) && HAVE_DECL_CYGWIN_CONV_PATH
+  string rVal;
+  char * aWin32Path =
+      (char *)cygwin_create_path(CCP_POSIX_TO_WIN_A, aPosixPath.c_str());
+  if (aWin32Path)
+  {
+	rVal = string(aWin32Path);
+    free(aWin32Path);
+  }
+  return rVal;
+#else
   char aWin32Path[MAX_PATH];
   cygwin_conv_to_win32_path(aPosixPath.c_str(), aWin32Path);
   return aWin32Path;
+#endif
 }
 #endif
 

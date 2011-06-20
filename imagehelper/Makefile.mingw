@@ -1,9 +1,0 @@
-#
-# MINGW flags 
-#
-CXXFLAGS_OPT= -mno-cygwin
-LDFLAGS_OPT=-lstdc++-2 -liberty 
-SYSTEM=mingw
-
-include Makefile.in
-

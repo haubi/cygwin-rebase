@@ -38,15 +38,24 @@ using namespace std;
 void Usage();
 int fVerbose = 1;
 
-#ifdef __CYGWIN__
+#if defined(__CYGWIN__) || defined(__MSYS__)
 char *Win32Path(char *s);
 char * Win32Path(char * s)
 {
-  char buf[MAX_PATH];
   if (!s || *s == '\0')
-    return "";
-  cygwin_conv_to_win32_path(s, buf);
-  return strdup(buf);
+    return strdup("");
+#if defined(HAVE_DECL_CYGWIN_CONV_PATH) && HAVE_DECL_CYGWIN_CONV_PATH
+  {
+    char * r = (char *)cygwin_create_path(CCP_POSIX_TO_WIN_A, s);
+	return (r ? r : strdup(""));
+  }
+#else
+  {
+    char buf[MAX_PATH];
+    cygwin_conv_to_win32_path(s, buf);
+    return strdup(buf);
+  }
+#endif
 }
 #else
 #define Win32Path(s)  s
