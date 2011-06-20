@@ -25,6 +25,10 @@
 
 #include <windows.h>
 
+#if defined(__MSYS__)
+typedef unsigned short uint16_t;
+typedef unsigned int   uint32_t;
+#endif
 
 static uint16_t coff_characteristics_set;
 static uint16_t coff_characteristics_clr;

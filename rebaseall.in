@@ -1,4 +1,4 @@
-#!/bin/ash
+#!/bin/@ASH@
 
 #
 # Copyright (c) 2003, 2005, 2006, 2008 Jason Tishler
@@ -17,8 +17,11 @@
 #
 
 # Define constants
-PATH=/bin
-ProgramName=`basename $0`
+tp1=${0%/*}
+tp2=${tp1:-.}
+PATH=$(cd $tp2 && pwd):@bindir@:/bin
+
+ProgramName=${0##*/}
 ProgramOptions='b:o:s:T:v'
 DefaultBaseAddress=0x70000000
 DefaultOffset=0x10000
@@ -107,7 +110,8 @@ TmpFile="$TmpDir/rebase.lst"
 # Create rebase list
 find /etc/setup -name '*.lst.gz' | xargs gzip -d -c |
     grep -E "\.($Suffixes)\$" |
-    sed -e '/cygwin1\.dll$/d' -e '/cyglsa.*\.dll$/d' -e 's/^/\//' >"$TmpFile"
+    sed -e '/cygwin1\.dll$/d' -e '/cyglsa.*\.dll$/d' \
+	-e 's/^/\//' -e '/d?ash\.exe$/d' -e '/rebase\.exe$/d' >"$TmpFile"
 
 # Append user supplied file list, if any
 if [ -n "$FileList" ]

@@ -1,0 +1,30 @@
+2010-06-02  Charles Wilson  <...>
+
+	Use autoconf. Configurable installation and SHELL.
+
+	* ChangeLog: New.
+	* COPYING: New.
+	* Changes: Renamed to...
+	* NEWS: this.
+	* build-aux/config.guess: New.
+	* build-aux/config.sub: New.
+	* build-aux/install-sh: New.
+	* Makefile: Removed.
+	* build.sh: Run configure. Modify to support MinGW
+	and MSYS, as well as Cygwin.
+	* configure.ac: New.
+	* Makefile.in: Rewrite for autoconf.
+	* peflagsall: Renamed to...
+	* peflagsall.in: this. Set PATH to directory of $0,
+	$(bindir), and /bin. Exclude dash as well as ash
+	from rebaselist, and peflags.exe itself. Don't die
+	if dash processes are running.
+	* rebaseall: Renamed to...
+	* rebaseall.in: this. Set PATH to directory of $0,
+	$(bindir), and /bin. Exclude dash as well as ash
+	from rebaselist, and rebase.exe itself.
+	* peflags.c: Accomodate MSYS.
+	* getopt.h_: Work around broken getopt_long on MSYS.
+	* getopt_long.c: Ditto.
+
+Prior: see NEWS file.
