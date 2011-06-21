@@ -194,7 +194,7 @@ parse_args (int argc, char *argv[])
   const char *anOptions = "b:do:T:vV";
   int anOption = 0;
 
-  for (anOption; (anOption = getopt (argc, argv, anOptions)) != -1;)
+  while ((anOption = getopt (argc, argv, anOptions)) != -1)
     {
       switch (anOption)
 	{
