@@ -111,6 +111,7 @@ TmpFile="$TmpDir/rebase.lst"
 find /etc/setup -name '*.lst.gz' | xargs gzip -d -c |
     grep -E "\.($Suffixes)\$" |
     sed -e '/cygwin1\.dll$/d' -e '/cyglsa.*\.dll$/d' \
+	-e '/sys-root\/mingw/d' \
 	-e 's/^/\//' -e '/d?ash\.exe$/d' -e '/rebase\.exe$/d' >"$TmpFile"
 
 # Append user supplied file list, if any

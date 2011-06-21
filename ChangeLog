@@ -1,5 +1,9 @@
 2011-06-21  Corinna Vinschen  <corinna@vinschen.de>
 
+	* rebaseall.in: Add "sys-root/mingw" to excluding sed expressions.
+
+2011-06-21  Corinna Vinschen  <corinna@vinschen.de>
+
 	* Makefile.in (CFLAGS): Override to enforce -Wall -Werror.
 	(CXXFLAGS): Ditto.
 	(LDFLAGS): Override to enforce static linking.
