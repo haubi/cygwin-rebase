@@ -1,6 +1,15 @@
 2011-06-21  Corinna Vinschen  <corinna@vinschen.de>
 
-	* rebase.c (parse_args): Avoid comiler warning.
+	* peflags.c: Avoid compiler warnings:
+	(display_flags): Convert long arguments to uint16_t.
+	(do_mark): Remove unused variable i;
+	(get_characteristics): Remove unused variable size;
+	(set_coff_characteristics): Ditto.
+	(set_pe_characteristics): Ditto.
+
+2011-06-21  Corinna Vinschen  <corinna@vinschen.de>
+
+	* rebase.c (parse_args): Avoid compiler warning.
 
 2011-06-21  Corinna Vinschen  <corinna@vinschen.de>
 

@@ -130,7 +130,8 @@ static int pe_get32 (int fd, off_t offset, uint32_t* value);
 static int pe_set16 (int fd, off_t offset, uint16_t value);
 
 static void display_flags (const char *field_name, const symbolic_flags_t *syms,
-                           long show_symbolic, long old_flag_value, long new_flag_value);
+                           uint16_t show_symbolic, uint16_t old_flag_value,
+			   uint16_t new_flag_value);
 static char *symbolic_flags (const symbolic_flags_t *syms, long show, long value);
 static void append_and_decorate (char **str, int is_set, const char *name, int len);
 static void *xmalloc (size_t num);
@@ -226,7 +227,6 @@ do_mark (const char *pathname)
   uint16_t new_coff_characteristics;
   uint16_t old_pe_characteristics;
   uint16_t new_pe_characteristics;
-  int i;
 
   /* Skip if file does not exist */
   if (access (pathname, F_OK) == -1)
@@ -359,7 +359,8 @@ do_mark (const char *pathname)
 
 static void
 display_flags (const char *field_name, const symbolic_flags_t *syms,
-               long show_symbolic, long old_flag_value, long new_flag_value)
+               uint16_t show_symbolic, uint16_t old_flag_value,
+	       uint16_t new_flag_value)
 {
   if (show_symbolic)
     {
@@ -682,7 +683,7 @@ get_characteristics(const char *pathname,
 {
   uint32_t pe_header_offset, opthdr_ofs;
   int status = 1;
-  int fd, size;
+  int fd;
   uint32_t pe_sig;
 
   fd = open (pathname, O_RDONLY|O_BINARY);
@@ -718,7 +719,7 @@ set_coff_characteristics(const char *pathname,
 {
   uint32_t pe_header_offset;
   int status = 1;
-  int fd, size;
+  int fd;
 
   /* no extra checking of file's contents below, because
      get_characteristics already did that */
@@ -751,7 +752,7 @@ set_pe_characteristics(const char *pathname,
 {
   uint32_t pe_header_offset, opthdr_ofs;
   int status = 1;
-  int fd, size;
+  int fd;
 
   /* no extra checking of file's contents below, because
      get_characteristics already did that */
