@@ -1,5 +1,11 @@
 2011-06-21  Corinna Vinschen  <corinna@vinschen.de>
 
+	* Makefile.in (CFLAGS): Override to enforce -Wall -Werror.
+	(CXXFLAGS): Ditto.
+	(LDFLAGS): Override to enforce static linking.
+
+2011-06-21  Corinna Vinschen  <corinna@vinschen.de>
+
 	* peflags.c (long_options): Add usable single char options where
 	missing.
 	(short_options): New variable.

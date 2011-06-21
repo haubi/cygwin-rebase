@@ -57,6 +57,10 @@ ASH = @ASH@
 DEFAULT_INCLUDES = -I. -I$(srcdir) -I$(srcdir)/imagehelper
 DEFS = @DEFS@ -DVERSION='"$(PACKAGE_VERSION)"' -DLIB_VERSION='"$(LIB_VERSION)"'
 
+override CFLAGS+=-Wall -Werror
+override CXXFLAGS+=-Wall -Werror
+override LDFLAGS+=-static -static-libgcc -static-libstdc++
+
 .SUFFIXES:
 .SUFFIXES: .c .cc .$(O)
 
