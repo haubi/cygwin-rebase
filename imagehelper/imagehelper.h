@@ -28,8 +28,8 @@ extern "C" {
 #endif
 
 BOOL ReBaseImage(
-  PSTR CurrentImageName,
-  PSTR SymbolPath,        // ignored
+  LPCSTR CurrentImageName,
+  LPCSTR SymbolPath,       // ignored
   BOOL fReBase,
   BOOL fRebaseSysfileOk,   // ignored
   BOOL fGoingDown,
@@ -42,9 +42,9 @@ BOOL ReBaseImage(
 );
 
 BOOL BindImage(
-  LPSTR ImageName,
-  LPSTR DllPath,
-  LPSTR SymbolPath
+  LPCSTR ImageName,
+  LPCSTR DllPath,
+  LPCSTR SymbolPath
 );
 
 typedef enum _IMAGEHLP_STATUS_REASON {
@@ -68,25 +68,25 @@ typedef BOOL(STDCALL*PIMAGEHLP_STATUS_ROUTINE)(IMAGEHLP_STATUS_REASON,LPSTR,LPST
 
 BOOL BindImageEx(
   DWORD Flags,
-  LPSTR ImageName,
-  LPSTR DllPath,
-  LPSTR SymbolPath,
+  LPCSTR ImageName,
+  LPCSTR DllPath,
+  LPCSTR SymbolPath,
   PIMAGEHLP_STATUS_ROUTINE
   StatusRoutine
 );
 
 BOOL GetImageInfos(
-  LPSTR ImageName,
+  LPCSTR ImageName,
   ULONG *ImageBase,
   ULONG *ImageSize
 );
 
 BOOL CheckImage(
-  LPSTR ImageName
+  LPCSTR ImageName
 );
 
 BOOL FixImage(
-  LPSTR ImageName
+  LPCSTR ImageName
 );
 
 DWORD SetImageHelperDebug(

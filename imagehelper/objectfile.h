@@ -27,10 +27,10 @@ class ObjectFile : public Base
   {
 
   public:
-    ObjectFile(char *FileName, bool writeable = false);
+    ObjectFile(const char *FileName, bool writeable = false);
 
     // return in the image stored filename
-    char *getFileName(void)
+    const char *getFileName(void)
     {
       return FileName;
     }
@@ -76,7 +76,7 @@ class LinkedObjectFile : public ObjectFile
   {
 
   public:
-    LinkedObjectFile(char *FileName, bool writable = false);
+    LinkedObjectFile(const char *FileName, bool writable = false);
     ~LinkedObjectFile();
 
     bool rebind(ObjectFileList &cache);

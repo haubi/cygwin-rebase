@@ -1,6 +1,28 @@
 2011-06-21  Corinna Vinschen  <corinna@vinschen.de>
 
-	* imagehelper/Makefile.in: Autoconfify call to ar.
+	* bindimage.cc (BindImageEx): Constify string arguments.
+	(BindImage): Ditto.
+	* checkimage.cc (CheckImage): Ditto.
+	* fiximage.cc (FixImage): Ditto.
+	* getimageinfos.cc (GetImageInfos): Ditto.
+	* imagehelper.h: Constify string arguments in declarations.
+	* objectfile.cc (Win32Path): Rewrite to use and return the Win32 path
+	as pointer to a static WCHAR buffer on all systems.  Simplify condition
+	to use cygwin_conv_path on Cygwin, cygwin_conv_to_win32_path on msys.
+	Use MultiByteToWideChar to create wide char pathname on non-Cygwin
+	systems.
+	(ObjectFile::ObjectFile): Constify string argument.  Store Win32 path
+	in local variable and use in calls to CreateFile.  Replace calls to
+	CreateFile with calls to CreateFileW.  Make basename a const char
+	pointer.
+	(LinkedObjectFile::LinkedObjectFile): Constify string argument.
+	* objectfile.h (ObjectFile::ObjectFile): Ditto.
+	(LinkedObjectFile::LinkedObjectFile): Ditto.
+	* rebaseimage.cc (ReBaseImage): Ditto.
+
+2011-06-21  Corinna Vinschen  <corinna@vinschen.de>
+
+	* Makefile.in: Autoconfify call to ar.
 
 2011-06-20  Charles Wilson  <cygwin@cwilson.fastmail.fm>
 

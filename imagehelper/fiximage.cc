@@ -24,7 +24,7 @@
 #include "objectfile.h"
 #include "imagehelper.h"
 
-BOOL FixImage(LPSTR filename)
+BOOL FixImage(LPCSTR filename)
 {
   LinkedObjectFile dll(filename,true);
 

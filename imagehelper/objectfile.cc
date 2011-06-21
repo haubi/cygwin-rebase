@@ -31,33 +31,32 @@
 #include <sys/cygwin.h>
 #endif
 
-#if defined(__CYGWIN__) || defined(__MSYS__)
-
-static char * Win32Path(char * s)
+static PCWSTR
+Win32Path(const char *s)
 {
+  /* No multithreading so a static global buffer is sufficient. */
+  static WCHAR w32_pbuf[32768];
+
   if (!s || *s == '\0')
-    return strdup("");
-#if defined(HAVE_DECL_CYGWIN_CONV_PATH) && HAVE_DECL_CYGWIN_CONV_PATH
-  {
-    char * r = (char *)cygwin_create_path (CCP_POSIX_TO_WIN_A, s);
-	return (r ? r : strdup(""));
-  }
-#else
+    return L"";
+#if defined(__CYGWIN__)
+  cygwin_conv_path (CCP_POSIX_TO_WIN_W, s, w32_pbuf, 32768 * sizeof (WCHAR));
+#elif defined(__MSYS__)
   {
     char buf[MAX_PATH];
     cygwin_conv_to_win32_path(s, buf);
-    return strdup(buf);
+    MultiByteToWideChar (CP_OEM, 0, buf, -1, w32_pbuf, 32768);
   }
-#endif
-}
 #else
-#define Win32Path(s)  s
+  MultiByteToWideChar (CP_OEM, 0, s, -1, w32_pbuf, 32768);
 #endif
+  return w32_pbuf;
+}
 
 
 //------- class ObjectFile ------------------------------------------
 
-ObjectFile::ObjectFile(char *aFileName, bool writeable)
+ObjectFile::ObjectFile(const char *aFileName, bool writeable)
 {
   sections = 0;
   isWritable = writeable;
@@ -65,9 +64,10 @@ ObjectFile::ObjectFile(char *aFileName, bool writeable)
   lpFileBase = 0;
   hfile = 0;
   hfilemapping = 0;
+  PCWSTR win32_path = Win32Path(aFileName);
 
   // search for raw filename
-  hfile = CreateFile(Win32Path(aFileName), writeable ? GENERIC_READ | GENERIC_WRITE : GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL,0);
+  hfile = CreateFileW(win32_path, writeable ? GENERIC_READ | GENERIC_WRITE : GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL,0);
   if (hfile != INVALID_HANDLE_VALUE)
     FileName = strdup(aFileName);
 
@@ -79,7 +79,7 @@ ObjectFile::ObjectFile(char *aFileName, bool writeable)
       char *s = getenv("PATH");
       strcpy(path,s);
 
-      char *basename = strrchr(aFileName,'/');
+      const char *basename = strrchr(aFileName,'/');
       basename = basename ? basename+1 : aFileName;
 
       for (s = strtok(path,":"); s; s = strtok(NULL,":") )
@@ -89,7 +89,7 @@ ObjectFile::ObjectFile(char *aFileName, bool writeable)
           strcat(name,basename);
           if (debug)
             std::cerr << __FUNCTION__ << ": name:" << name << std::endl;
-          hfile = CreateFile(Win32Path(name), writeable ? GENERIC_READ | GENERIC_WRITE : GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL,0);
+          hfile = CreateFileW(win32_path, writeable ? GENERIC_READ | GENERIC_WRITE : GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL,0);
           // found
           if (hfile != INVALID_HANDLE_VALUE)
             break;
@@ -157,7 +157,7 @@ ObjectFile::~ObjectFile()
 
 int LinkedObjectFile::level = 0;
 
-LinkedObjectFile::LinkedObjectFile(char *aFileName, bool writable) : ObjectFile(aFileName,writable)
+LinkedObjectFile::LinkedObjectFile(const char *aFileName, bool writable) : ObjectFile(aFileName,writable)
 {
   exports = 0;
   imports = 0;

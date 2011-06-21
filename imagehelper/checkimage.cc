@@ -25,7 +25,7 @@
 #include "imagehelper.h"
 
 
-BOOL CheckImage(LPSTR filename)
+BOOL CheckImage(LPCSTR filename)
 {
   LinkedObjectFile dll(filename);
 

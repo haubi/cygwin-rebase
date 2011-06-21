@@ -27,7 +27,7 @@
 #include "imagehelper.h"
 
 
-BOOL GetImageInfos(LPSTR filename, ULONG *ImageBase, ULONG *ImageSize)
+BOOL GetImageInfos(LPCSTR filename, ULONG *ImageBase, ULONG *ImageSize)
 {
   LinkedObjectFile dll(filename);
 

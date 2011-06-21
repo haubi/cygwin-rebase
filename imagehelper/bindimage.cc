@@ -26,9 +26,9 @@
 
 BOOL BindImageEx(
   DWORD Flags,
-  LPSTR ImageName,
-  LPSTR DllPath,
-  LPSTR SymbolPath,
+  LPCSTR ImageName,
+  LPCSTR DllPath,
+  LPCSTR SymbolPath,
   PIMAGEHLP_STATUS_ROUTINE StatusRoutine
 )
 {
@@ -55,9 +55,9 @@ BOOL BindImageEx(
 
 
 BOOL BindImage(
-  LPSTR ImageName,
-  LPSTR DllPath,
-  LPSTR SymbolPath
+  LPCSTR ImageName,
+  LPCSTR DllPath,
+  LPCSTR SymbolPath
 )
 {
   return BindImageEx(0,ImageName,DllPath,SymbolPath,0);

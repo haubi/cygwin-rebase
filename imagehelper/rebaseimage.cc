@@ -25,8 +25,8 @@
 #include "imagehelper.h"
 
 BOOL ReBaseImage(
-  PSTR CurrentImageName,
-  PSTR SymbolPath,        // ignored
+  LPCSTR CurrentImageName,
+  LPCSTR SymbolPath,       // ignored
   BOOL fReBase,
   BOOL fRebaseSysfileOk,   // ignored
   BOOL fGoingDown,
