@@ -60,7 +60,7 @@ ObjectFile *ObjectFileList::get
   {
     ObjectFile *p;
     reset();
-    while (p = getNext())
+    while ((p = getNext()) != NULL)
       {
         if (strstr(FileName,p->getFileName()))
           return p;
@@ -72,7 +72,7 @@ ObjectFileList::~ObjectFileList()
 {
   ObjectFile *p;
   reset();
-  while (p = getNext())
+  while ((p = getNext()) != NULL)
     delete p;
 }
 

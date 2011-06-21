@@ -186,7 +186,7 @@ void Exports::dump(char *title)
   else
     {
       reset();
-      while (p = getNext())
+      while ((p = getNext()) != NULL)
         {
           std::cout << "\t" << p << std::endl;
         }
@@ -238,7 +238,7 @@ void Imports::dump(char *title)
   std::cout << "imports" << std::endl;
 
   reset();
-  while (p = getNextDescriptor())
+  while ((p = getNextDescriptor()) != NULL)
     {
       std::cout << p->Name + adjust << std::endl;
       std::cout << "vma:           Hint     Time      Forward  DLL       First" << std::endl;
@@ -287,7 +287,7 @@ bool Relocations::check(void)
   if (debug)
     std::cerr << "debug: checking relocations .... " << std::endl;
 
-  for (; (char *)&relocp->SizeOfBlock < (char *)relocs + size && relocp->SizeOfBlock != 0; ((char *&)relocp) += relocp->SizeOfBlock)
+  for (; &relocp->SizeOfBlock < (PDWORD) ((char *)relocs + size) && relocp->SizeOfBlock != 0; relocp = (PIMAGE_BASE_RELOCATION) ((char *)relocp + relocp->SizeOfBlock))
     {
       int NumOfRelocs = (relocp->SizeOfBlock - sizeof(IMAGE_BASE_RELOCATION)) / sizeof (WORD);
       int va = relocp->VirtualAddress;
@@ -330,11 +330,9 @@ bool Relocations::fix(void)
   if (debug)
     std::cerr << "warning: fixing bad relocations .... ";
 
-  for (; (char *)&relocp->SizeOfBlock < (char *)relocs + size && relocp->SizeOfBlock != 0; ((char *&)relocp) += relocp->SizeOfBlock)
+  for (; &relocp->SizeOfBlock < (PDWORD) ((char *)relocs + size) && relocp->SizeOfBlock != 0; relocp = (PIMAGE_BASE_RELOCATION) ((char *)relocp + relocp->SizeOfBlock))
     {
-      int NumOfRelocs = (relocp->SizeOfBlock - sizeof(IMAGE_BASE_RELOCATION)) / sizeof (WORD);
       int va = relocp->VirtualAddress;
-      PWORD p = (PWORD)((unsigned int )relocp + sizeof(IMAGE_BASE_RELOCATION));
 
       cursec = sections->find(va);
       if (!cursec)
@@ -365,7 +363,7 @@ bool Relocations::relocate(int difference)
   if (!relocs)
     return false;
 
-  for (; (char *)&relocp->SizeOfBlock < (char *)relocs + size && relocp->SizeOfBlock != 0; ((char *&)relocp) += relocp->SizeOfBlock)
+  for (; &relocp->SizeOfBlock < (PDWORD) ((char *)relocs + size) && relocp->SizeOfBlock != 0; relocp = (PIMAGE_BASE_RELOCATION) ((char *)relocp + relocp->SizeOfBlock))
     {
       int NumOfRelocs = (relocp->SizeOfBlock - sizeof(IMAGE_BASE_RELOCATION)) / sizeof (WORD);
       int va = relocp->VirtualAddress;

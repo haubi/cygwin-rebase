@@ -54,6 +54,9 @@ FGREP = @FGREP@
 DEFAULT_INCLUDES = -I. -I$(srcdir)
 DEFS = @DEFS@
 
+override CFLAGS+=-Wall -Werror
+override CXXFLAGS+=-Wall -Werror
+
 .SUFFIXES:
 .SUFFIXES: .c .cc .$(O)
 

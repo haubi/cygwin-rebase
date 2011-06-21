@@ -39,8 +39,8 @@ Win32Path(const char *s)
 
   if (!s || *s == '\0')
     return L"";
-#if defined(__CYGWIN__)
-  cygwin_conv_path (CCP_POSIX_TO_WIN_W, s, w32_pbuf, 32768 * sizeof (WCHAR));
+#if !defined (__CYGWIN__)
+  MultiByteToWideChar (CP_OEM, 0, s, -1, w32_pbuf, 32768);
 #elif defined(__MSYS__)
   {
     char buf[MAX_PATH];
@@ -48,7 +48,7 @@ Win32Path(const char *s)
     MultiByteToWideChar (CP_OEM, 0, buf, -1, w32_pbuf, 32768);
   }
 #else
-  MultiByteToWideChar (CP_OEM, 0, s, -1, w32_pbuf, 32768);
+  cygwin_conv_path (CCP_POSIX_TO_WIN_W, s, w32_pbuf, 32768 * sizeof (WCHAR));
 #endif
   return w32_pbuf;
 }
@@ -206,7 +206,6 @@ bool LinkedObjectFile::rebind(ObjectFileList &cache)
 
   ImportDescriptor *p;
 
-  Section *edata = sections->find(".edata");
   Section *idata = sections->find(".idata");
   Section *text = sections->find(".text");
 
@@ -214,7 +213,7 @@ bool LinkedObjectFile::rebind(ObjectFileList &cache)
 
   imports->reset();
 
-  while (p = imports->getNextDescriptor())
+  while ((p = imports->getNextDescriptor()) != NULL)
     {
       bool autoImportFlag;
       int *patch_address;
@@ -295,7 +294,7 @@ bool LinkedObjectFile::rebind(ObjectFileList &cache)
 
   cache.reset();
 
-  while (obj = (LinkedObjectFile *)cache.getNext())
+  while ((obj = (LinkedObjectFile *)cache.getNext()) != NULL)
     {
       bp->TimeDateStamp = time(0);
       bp->OffsetModuleName = (uint)bp2 - (uint)bp_org;
@@ -317,6 +316,7 @@ bool LinkedObjectFile::rebind(ObjectFileList &cache)
   bdp->VirtualAddress = (uint) bp_org - (uint)lpFileBase;
   bdp->Size = (uint) bp2 - (uint) bp_org;
 #endif
+  return true;
 }
 
 bool LinkedObjectFile::PrintDependencies(ObjectFileList &cache)
@@ -342,10 +342,8 @@ bool LinkedObjectFile::PrintDependencies(ObjectFileList &cache)
       return true;
     }
 
-  while (p = imports->getNextDescriptor())
+  while ((p = imports->getNextDescriptor()) != NULL)
     {
-      bool autoImportFlag;
-      int *patch_address;
       Section *sect = sections->find(p->Name);
       char *dllname = (char *)p->Name + sect->getAdjust();
 
@@ -387,7 +385,7 @@ bool LinkedObjectFile::unbind(void)
 
   ImportDescriptor *p;
 
-  while (p = imports->getNextDescriptor())
+  while ((p = imports->getNextDescriptor()) != NULL)
     {
 
       // set
@@ -402,6 +400,7 @@ bool LinkedObjectFile::unbind(void)
   // set data directory entry
   bdp->VirtualAddress = 0;
   bdp->Size = 0;
+  return true;
 }
 
 

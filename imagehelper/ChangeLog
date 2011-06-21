@@ -1,5 +1,11 @@
 2011-06-21  Corinna Vinschen  <corinna@vinschen.de>
 
+	Throughout, avoid all compiler warnings.
+	* Makefile.in (CFLAGS): Override to enforce -Wall -Werror.
+	(CXXFLAGS): Ditto.
+
+2011-06-21  Corinna Vinschen  <corinna@vinschen.de>
+
 	* bindimage.cc (BindImageEx): Constify string arguments.
 	(BindImage): Ditto.
 	* checkimage.cc (CheckImage): Ditto.

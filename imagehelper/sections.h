@@ -162,7 +162,7 @@ class Exports : SectionBase
   private:
     ExportDirectory *exports;
     DataDirectory *header;
-    int iterator;
+    DWORD iterator;
     //  int adjust;
 
   };
