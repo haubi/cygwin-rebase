@@ -24,6 +24,7 @@ AC_PROG_FGREP
 
 AC_PROG_CC
 AC_PROG_CXX
+AC_CHECK_TOOL(AR, ar, ar)
 
 AC_CHECK_DECLS([cygwin_conv_path], [],[
   case "$host" in

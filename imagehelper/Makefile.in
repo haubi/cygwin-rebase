@@ -34,6 +34,7 @@ EXEEXT = @EXEEXT@
 O = $(OBJEXT)
 DESTDIR =
 
+AR = @AR@
 CC = @CC@
 CFLAGS = @CFLAGS@
 CPPFLAGS = @CPPFLAGS@
@@ -107,7 +108,7 @@ all: $(LIB_TARGET) $(TARGETS)
 $(LIB_TARGET): $(LIB_TARGET_FILE)
 
 $(LIB_TARGET_FILE): $(LIB_OBJS) 
-	ar -cru $@ $^
+	$(AR) -cru $@ $^
 
 $(REBASE_TARGET): $(REBASE_OBJS)
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
