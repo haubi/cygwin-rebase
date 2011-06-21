@@ -80,9 +80,9 @@ SRC_DISTFILES = aclocal.m4 configure.ac configure Makefile.in \
 	build-aux/config.guess build-aux/config.sub \
 	build-aux/install-sh getopt.h_ getopt_long.c
 
-all: rebase$(EXEEXT) peflags$(EXEEXT) rebaseall peflagsall
+all: libimagehelper rebase$(EXEEXT) peflags$(EXEEXT) rebaseall peflagsall
 
-$(LIBIMAGEHELPER):
+libimagehelper:
 	$(MAKE) -C imagehelper imagehelper
 
 rebase$(EXEEXT): $(REBASE_LIBS) $(REBASE_OBJS)

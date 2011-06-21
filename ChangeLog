@@ -1,5 +1,11 @@
 2011-06-21  Corinna Vinschen  <corinna@vinschen.de>
 
+	* Makefile.in (all): Prepend libimagehelper target to dependency list.
+	(libimagehelper): Rename from $(LIBIMAGEHELPER) to allow imagehelper
+	Makefile to decide if imagejhelper lib has to be rebuilt.
+
+2011-06-21  Corinna Vinschen  <corinna@vinschen.de>
+
 	* configure.ac: Check for ar.
 	* imagehelper/Makefile.in: Autoconfify call to ar.
 
