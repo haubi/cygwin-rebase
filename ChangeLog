@@ -1,5 +1,16 @@
 2011-06-21  Corinna Vinschen  <corinna@vinschen.de>
 
+	* peflags.c (long_options): Add usable single char options where
+	missing.
+	(short_options): New variable.
+	(main): Don't exit on error if there are still files to proceed on.
+	(do_mark): Add verbose flag printing.
+	(parse_args): Accommodate changes to single-char options.
+	(help): Ditto.
+	(version): Fix copyright.
+
+2011-06-21  Corinna Vinschen  <corinna@vinschen.de>
+
 	* rebase.c (image_info_flag): New flag.
 	(img_info_list, img_info_size, img_info_max_size): New global
 	variables used to print image info.

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009 Charles Wilson
+ * Copyright (c) 2009, 2011 Charles Wilson
  * Based on rebase.c by Jason Tishler
  * Significant contributions by Dave Korn
  *
@@ -85,33 +85,25 @@ static const symbolic_flags_t pe_symbolic_flags[] = {
 };
 
 
-#define OPTION_FORCE_INTEGRITY			150
-#define OPTION_NO_ISOLATION			OPTION_FORCE_INTEGRITY+1
-#define OPTION_NO_SEH				OPTION_NO_ISOLATION+1
-#define OPTION_NO_BIND				OPTION_NO_SEH+1
-#define OPTION_WDM_DRIVER			OPTION_NO_BIND+1
-#define OPTION_AGGRESIVE_WS_TRIM		OPTION_WDM_DRIVER+1
-#define OPTION_LARGE_ADDRESS_AWARE		OPTION_AGGRESIVE_WS_TRIM+1
-#define OPTION_DEBUG_STRIPPED			OPTION_LARGE_ADDRESS_AWARE+1
-
 static struct option long_options[] = {
   {"dynamicbase",  optional_argument, NULL, 'd'},
-  {"forceinteg",   optional_argument, NULL, OPTION_FORCE_INTEGRITY},
+  {"forceinteg",   optional_argument, NULL, 'f'},
   {"nxcompat",     optional_argument, NULL, 'n'},
-  {"no-isolation", optional_argument, NULL, OPTION_NO_ISOLATION},
-  {"no-seh",       optional_argument, NULL, OPTION_NO_SEH},
-  {"no-bind",      optional_argument, NULL, OPTION_NO_BIND},
-  {"wdmdriver",    optional_argument, NULL, OPTION_WDM_DRIVER},
+  {"no-isolation", optional_argument, NULL, 'i'},
+  {"no-seh",       optional_argument, NULL, 's'},
+  {"no-bind",      optional_argument, NULL, 'b'},
+  {"wdmdriver",    optional_argument, NULL, 'W'},
   {"tsaware",      optional_argument, NULL, 't'},
-  {"wstrim",       optional_argument, NULL, OPTION_AGGRESIVE_WS_TRIM},
-  {"bigaddr",      optional_argument, NULL, OPTION_LARGE_ADDRESS_AWARE},
-  {"sepdbg",       optional_argument, NULL, OPTION_DEBUG_STRIPPED},
+  {"wstrim",       optional_argument, NULL, 'w'},
+  {"bigaddr",      optional_argument, NULL, 'l'},
+  {"sepdbg",       optional_argument, NULL, 'S'},
   {"filelist",     no_argument, NULL, 'T'},
   {"verbose",      no_argument, NULL, 'v'},
   {"help",         no_argument, NULL, 'h'},
   {"version",      no_argument, NULL, 'V'},
   {NULL, no_argument, NULL, 0}
 };
+static const char *short_options = "d::f::n::i::s::b::W::t::w::l::S::T:vhV";
 
 static void short_usage (FILE *f);
 static void help (FILE *f);
@@ -161,13 +153,14 @@ main (int argc, char *argv[])
 {
   int files_attempted = 0;
   int i = 0;
+  int ret = 0;
 
   parse_args (argc, argv);
 
   /* Operate on files in file list, if specified. */
   if (file_list)
     {
-      int status = 0;
+      int status = 0, ret = 0;
       char filename[MAX_PATH + 2];
       FILE *file = file_list_fopen (file_list);
 
@@ -178,7 +171,7 @@ main (int argc, char *argv[])
 	{
           files_attempted++;
 	  if ((status = do_mark (filename)) != 0)
-	    break;
+	    ret = 2;
 	}
 
       file_list_fclose (file);
@@ -189,10 +182,7 @@ main (int argc, char *argv[])
           fprintf (stderr,
              "Error: Could not find any filenames in %s\n",
              (strcmp(file_list, stdin_file_list) == 0 ? "<stdin>" : file_list));
-          exit (2);
         }
-      if (status != 0)
-	exit (2);
     }
 
   /* Operate on files listed as command line arguments.
@@ -204,7 +194,7 @@ main (int argc, char *argv[])
       const char *filename = argv[i];
       files_attempted++;
       if (do_mark (filename) != 0)
-	exit (2);
+	ret = 2;
     }
 
   if (files_attempted == 0)
@@ -215,8 +205,9 @@ main (int argc, char *argv[])
       exit (2);
     }
 
-  exit (0);
+  return ret;
 }
+
 int
 do_mark (const char *pathname)
 {
@@ -344,11 +335,13 @@ do_mark (const char *pathname)
     {
       printf ("%s: ", pathname);
       display_flags ("coff", coff_symbolic_flags,
-                     coff_characteristics_show,
+                     coff_characteristics_show ?:
+                     verbose ? old_coff_characteristics : 0,
                      old_coff_characteristics,
                      new_coff_characteristics);
       display_flags ("pe", pe_symbolic_flags,
-                     pe_characteristics_show,
+                     pe_characteristics_show ?:
+                     verbose ? old_pe_characteristics : 0,
                      old_pe_characteristics,
                      new_pe_characteristics);
       puts ("");
@@ -486,6 +479,7 @@ handle_pe_flag_option (const char *option_name,
         pe_characteristics_clr |= flag_value;
     }
 }
+
 static void
 handle_coff_flag_option (const char *option_name,
                          const char *option_arg,
@@ -511,6 +505,7 @@ handle_coff_flag_option (const char *option_name,
         coff_characteristics_clr |= flag_value;
     }
 }
+
 void
 parse_args (int argc, char *argv[])
 {
@@ -519,7 +514,7 @@ parse_args (int argc, char *argv[])
   while (1)
     {
       int option_index = 0;
-      c = getopt_long (argc, argv, "d::t::n::T:vhV", long_options, &option_index);
+      c = getopt_long (argc, argv, short_options, long_options, &option_index);
       if (c == -1)
         break;
 
@@ -549,42 +544,42 @@ parse_args (int argc, char *argv[])
 	                         optarg,
 	                         IMAGE_DLLCHARACTERISTICS_TERMINAL_SERVER_AWARE);
 	  break;
-	case OPTION_FORCE_INTEGRITY:
+	case 'f':
 	  handle_pe_flag_option (long_options[option_index].name,
 	                         optarg,
 	                         IMAGE_DLL_CHARACTERISTICS_FORCE_INTEGRITY);
 	  break;
-	case OPTION_NO_ISOLATION:
+	case 'i':
 	  handle_pe_flag_option (long_options[option_index].name,
 	                         optarg,
 	                         IMAGE_DLLCHARACTERISTICS_NO_ISOLATION);
 	  break;
-	case OPTION_NO_SEH:
+	case 's':
 	  handle_pe_flag_option (long_options[option_index].name,
 	                         optarg,
 	                         IMAGE_DLLCHARACTERISTICS_NO_SEH);
 	  break;
-	case OPTION_NO_BIND:
+	case 'b':
 	  handle_pe_flag_option (long_options[option_index].name,
 	                         optarg,
 	                         IMAGE_DLLCHARACTERISTICS_NO_BIND);
 	  break;
-	case OPTION_WDM_DRIVER:
+	case 'W':
 	  handle_pe_flag_option (long_options[option_index].name,
 	                         optarg,
 	                         IMAGE_DLLCHARACTERISTICS_WDM_DRIVER);
 	  break;
-	case OPTION_AGGRESIVE_WS_TRIM:
+	case 'w':
 	  handle_coff_flag_option (long_options[option_index].name,
 	                           optarg,
 	                           IMAGE_FILE_AGGRESIVE_WS_TRIM);
 	  break;
-	case OPTION_LARGE_ADDRESS_AWARE:
+	case 'l':
 	  handle_coff_flag_option (long_options[option_index].name,
 	                           optarg,
 	                           IMAGE_FILE_LARGE_ADDRESS_AWARE);
 	  break;
-	case OPTION_DEBUG_STRIPPED:
+	case 'S':
 	  handle_coff_flag_option (long_options[option_index].name,
 	                           optarg,
 	                           IMAGE_FILE_DEBUG_STRIPPED);
@@ -871,20 +866,20 @@ help (FILE *f)
   fputs ("\n", f);
   fputs ("  -d, --dynamicbase  [BOOL]   Image base address may be relocated using\n", f);
   fputs ("                              address space layout randomization (ASLR)\n", f);
-  fputs ("      --forceinteg   [BOOL]   Code integrity checks are enforced\n", f);
+  fputs ("  -f, --forceinteg   [BOOL]   Code integrity checks are enforced\n", f);
   fputs ("  -n, --nxcompat     [BOOL]   Image is compatible with data execution\n", f);
   fputs ("                              prevention\n", f);
-  fputs ("      --no-isolation [BOOL]   Image understands isolation but do not\n", f);
+  fputs ("  -i, --no-isolation [BOOL]   Image understands isolation but do not\n", f);
   fputs ("                              isolate the image\n", f);
-  fputs ("      --no-seh       [BOOL]   Image does not use SEH. No SE handler may\n", f);
+  fputs ("  -s, --no-seh       [BOOL]   Image does not use SEH. No SE handler may\n", f);
   fputs ("                              be called in this image\n", f);
-  fputs ("      --no-bind      [BOOL]   Do not bind this image\n", f);
-  fputs ("      --wdmdriver    [BOOL]   Driver uses the WDM model\n", f);
+  fputs ("  -b, --no-bind      [BOOL]   Do not bind this image\n", f);
+  fputs ("  -W, --wdmdriver    [BOOL]   Driver uses the WDM model\n", f);
   fputs ("  -t, --tsaware      [BOOL]   Image is Terminal Server aware\n", f);
-  fputs ("      --wstrim       [BOOL]   Aggressively trim the working set.\n", f);
-  fputs ("      --bigaddr      [BOOL]   The application can handle addresses\n", f);
+  fputs ("  -w, --wstrim       [BOOL]   Aggressively trim the working set.\n", f);
+  fputs ("  -l, --bigaddr      [BOOL]   The application can handle addresses\n", f);
   fputs ("                              larger than 2 GB\n", f);
-  fputs ("      --sepdbg       [BOOL]   Debugging information was removed and\n", f);
+  fputs ("  -S, --sepdbg       [BOOL]   Debugging information was removed and\n", f);
   fputs ("                              stored separately in another file.\n", f);
   fputs ("  -T, --filelist FILE         Indicate that FILE contains a list\n", f);
   fputs ("                              of PE files to process\n", f);
@@ -906,6 +901,6 @@ static void
 version (FILE *f)
 {
   fprintf (f, "peflags version %s\n", VERSION);
-  fprintf (f, "Copyright (c) 2009  Charles Wilson, Dave Korn, Jason Tishler\n");
+  fprintf (f, "Copyright (c) 2009, 2011  Charles Wilson, Dave Korn, Jason Tishler, et al.\n");
 }
 
