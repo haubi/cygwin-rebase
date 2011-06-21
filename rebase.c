@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2001, 2002, 2003 Jason Tishler
+ * Copyright (c) 2001, 2002, 2003, 2004, 2008, 2011 Jason Tishler
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -22,9 +22,13 @@
 #include <fcntl.h>
 #include <string.h>
 #include <unistd.h>
+#include <locale.h>
 #include <getopt.h>
+#include <string.h>
 #include "imagehelper.h"
 
+BOOL collect_image_info (const char *pathname);
+void print_image_info ();
 BOOL rebase (const char *pathname, ULONG *new_image_base);
 void parse_args (int argc, char *argv[]);
 unsigned long string_to_ulong (const char *string);
@@ -37,11 +41,28 @@ void version ();
 
 ULONG image_base = 0;
 BOOL down_flag = FALSE;
+BOOL image_info_flag = FALSE;
 ULONG offset = 0;
 int args_index = 0;
 int verbose = 0;
 const char *file_list = 0;
 const char *stdin_file_list = "-";
+
+typedef struct _img_info
+{
+  const char *name;
+  ULONG base;
+  ULONG size;
+} img_info_t;
+
+img_info_t *img_info_list = NULL;
+unsigned int img_info_size = 0;
+unsigned int img_info_max_size = 0;
+
+#ifdef __CYGWIN__
+ULONG cygwin_dll_image_base = 0;
+ULONG cygwin_dll_image_size = 0;
+#endif
 
 int
 main (int argc, char *argv[])
@@ -49,8 +70,14 @@ main (int argc, char *argv[])
   ULONG new_image_base = 0;
   int i = 0;
 
+  setlocale (LC_ALL, "");
   parse_args (argc, argv);
   new_image_base = image_base;
+
+#ifdef __CYGWIN__
+  GetImageInfos ("/bin/cygwin1.dll", &cygwin_dll_image_base,
+				     &cygwin_dll_image_size);
+#endif
 
   /* Rebase file list, if specified. */
   if (file_list)
@@ -63,7 +90,8 @@ main (int argc, char *argv[])
 
       while (file_list_fgets (filename, MAX_PATH + 2, file))
 	{
-	  status = rebase (filename, &new_image_base);
+	  status = image_info_flag ? collect_image_info (filename)
+				    : rebase (filename, &new_image_base);
 	  if (!status)
 	    break;
 	}
@@ -77,12 +105,72 @@ main (int argc, char *argv[])
   for (i = args_index; i < argc; i++)
     {
       const char *filename = argv[i];
-      BOOL status = rebase (filename, &new_image_base);
+      BOOL status = image_info_flag ? collect_image_info (filename)
+				     : rebase (filename, &new_image_base);
       if (!status)
 	exit (2);
     }
 
+  if (image_info_flag)
+    print_image_info ();
+
   exit (0);
+}
+
+BOOL
+collect_image_info (const char *pathname)
+{
+  /* Skip if file does not exist to prevent ReBaseImage() from using it's
+     stupid search algorithm (e.g, PATH, etc.). */
+  if (access (pathname, F_OK) == -1)
+    {
+      fprintf (stderr, "%s: skipped because nonexistent\n", pathname);
+      return TRUE;
+    }
+
+  if (img_info_size <= img_info_max_size)
+    {
+      img_info_max_size += 100;
+      img_info_list = (img_info_t *) realloc (img_info_list,
+					      img_info_max_size
+					      * sizeof (img_info_t));
+      if (!img_info_list)
+	{
+	  fprintf (stderr, "Out of memory.\n");
+	  exit (2);
+	}
+    }
+
+  if (GetImageInfos (pathname, &img_info_list[img_info_size].base,
+			       &img_info_list[img_info_size].size))
+    img_info_list[img_info_size++].name = strdup (pathname);
+  return TRUE;
+}
+
+int
+img_info_cmp (const void *a, const void *b)
+{
+  ULONG abase = ((img_info_t *) a)->base;
+  ULONG bbase = ((img_info_t *) b)->base;
+
+  if (abase < bbase)
+    return -1;
+  if (abase > bbase)
+    return 1;
+  return strcmp (((img_info_t *) a)->name, ((img_info_t *) b)->name);
+}
+
+void
+print_image_info ()
+{
+  unsigned int i;
+
+  qsort (img_info_list, img_info_size, sizeof (img_info_t), img_info_cmp);
+  for (i = 0; i < img_info_size; ++i)
+    printf ("%-47s base 0x%08lx size 0x%08lx\n",
+	    img_info_list[i].name,
+	    img_info_list[i].base,
+	    img_info_list[i].size);
 }
 
 BOOL
@@ -117,6 +205,10 @@ rebase (const char *pathname, ULONG *new_image_base)
   /* Calculate next base address, if rebasing down. */
   if (down_flag)
     *new_image_base -= offset;
+
+#ifdef __CYGWIN__
+retry:
+#endif
 
   /* Rebase the image. */
   prev_new_image_base = *new_image_base;
@@ -173,6 +265,17 @@ rebase (const char *pathname, ULONG *new_image_base)
       return FALSE;
     }
 
+#ifdef __CYGWIN__
+  /* Avoid the case that a DLL is rebased into the address space taken
+     by the Cygwin DLL. */
+  if (*new_image_base >= cygwin_dll_image_base
+      && *new_image_base <= cygwin_dll_image_base + cygwin_dll_image_size)
+    {
+      *new_image_base = cygwin_dll_image_base - offset;
+      goto retry;
+    }
+#endif
+
   /* Display rebase results, if verbose. */
   if (verbose)
     {
@@ -191,7 +294,7 @@ rebase (const char *pathname, ULONG *new_image_base)
 void
 parse_args (int argc, char *argv[])
 {
-  const char *anOptions = "b:do:T:vV";
+  const char *anOptions = "b:dio:T:vV";
   int anOption = 0;
 
   while ((anOption = getopt (argc, argv, anOptions)) != -1)
@@ -203,6 +306,9 @@ parse_args (int argc, char *argv[])
 	  break;
 	case 'd':
 	  down_flag = TRUE;
+	  break;
+	case 'i':
+	  image_info_flag = TRUE;
 	  break;
 	case 'o':
 	  offset = string_to_ulong (optarg);
@@ -224,7 +330,8 @@ parse_args (int argc, char *argv[])
 	}
     }
 
-  if (image_base == 0)
+  if ((image_base == 0 && !image_info_flag)
+      || (image_base && image_info_flag))
     {
       usage ();
       exit (1);
@@ -246,7 +353,8 @@ usage ()
 {
   fprintf (stderr,
 	   "usage: rebase -b BaseAddress [-Vdv] [-o Offset] "
-	   "[-T FileList | -] Files...\n");
+	   "[-T FileList | -] Files...\n"
+	   "       rebase -i [-T FileList | -] Files...\n");
 }
 
 BOOL
@@ -308,7 +416,7 @@ file_list_fopen (const char *file_list)
   FILE *file = stdin;
   if (strcmp(file_list, stdin_file_list) != 0)
     {
-      file = fopen (file_list, "r");
+      file = fopen (file_list, "rt");
       if (!file)
 	fprintf (stderr, "cannot read %s\n", file_list);
     }
@@ -342,6 +450,6 @@ version ()
 {
   fprintf (stderr, "rebase version %s (imagehelper version %s)\n",
 	   VERSION, LIB_VERSION);
-  fprintf (stderr, "Copyright (c) 2001, 2002, 2003, 2004, 2008 "
-	   "Ralf Habacker and Jason Tishler\n");
+  fprintf (stderr, "Copyright (c) 2001, 2002, 2003, 2004, 2008, 2011 "
+	   "Ralf Habacker, Jason Tishler, et al.\n");
 }

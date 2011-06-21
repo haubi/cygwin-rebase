@@ -1,5 +1,22 @@
 2011-06-21  Corinna Vinschen  <corinna@vinschen.de>
 
+	* rebase.c (image_info_flag): New flag.
+	(img_info_list, img_info_size, img_info_max_size): New global
+	variables used to print image info.
+	(main): Call setlocale.  On Cygwin fetch base address and size of
+	Cygwin DLL.  If image_info_flag is set, call collect_image_info
+	rather than rebase in loop and eventually call print_image_info.
+	(collect_image_info): New function.
+	(img_info_cmp): New function.
+	(print_image_info): New function.
+	(rebase): On Cygwin, if a DLL has been rebased into the address space
+	taken by the Cygwin DLL, move new_image_base and rebase again.
+	(parse_args): Handle -i option.
+	(usage): Add -i option to usage output.
+	(version): Fix copyright.
+
+2011-06-21  Corinna Vinschen  <corinna@vinschen.de>
+
 	* peflags.c: Avoid compiler warnings:
 	(display_flags): Convert long arguments to uint16_t.
 	(do_mark): Remove unused variable i;
