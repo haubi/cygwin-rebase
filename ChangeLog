@@ -1,3 +1,10 @@
+2011-06-28  Corinna Vinschen  <corinna@vinschen.de>
+
+	* configure.ac (DEFAULT_OFFSET_VALUE): Define host-dependent.
+	* Makefile.in (DEFAULT_OFFSET_VALUE): Define.
+	(edit): Substitute DEFAULT_OFFSET_VALUE.
+	* rebaseall.in (DefaultOffset): Make configurable during build.
+
 2011-06-21  Corinna Vinschen  <corinna@vinschen.de>
 
 	* rebaseall.in: Add "sys-root/mingw" to excluding sed expressions.

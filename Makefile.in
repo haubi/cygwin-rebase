@@ -42,6 +42,7 @@ CFLAGS = @CFLAGS@
 CPPFLAGS = @CPPFLAGS@
 CXX = @CXX@
 CXXFLAGS = @CXXFLAGS@
+DEFAULT_OFFSET_VALUE = @DEFAULT_OFFSET_VALUE@
 LDFLAGS = @LDFLAGS@
 INSTALL = @INSTALL@
 INSTALL_DATA = @INSTALL_DATA@
@@ -111,7 +112,8 @@ edit = sed \
 	-e 's|@pkgdatadir[@]|$(pkgdatadir)|g' \
 	-e 's|@prefix[@]|$(prefix)|g' \
 	-e 's|@exec_prefix[@]|$(exec_prefix)|g' \
-	-e 's|@ASH[@]|$(ASH)|g'
+	-e 's|@ASH[@]|$(ASH)|g' \
+	-e 's|@DEFAULT_OFFSET_VALUE[@]|$(DEFAULT_OFFSET_VALUE)|g'
 
 rebaseall peflagsall: Makefile
 	rm -f $@ $@.tmp

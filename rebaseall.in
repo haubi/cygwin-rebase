@@ -1,7 +1,7 @@
 #!/bin/@ASH@
 
 #
-# Copyright (c) 2003, 2005, 2006, 2008 Jason Tishler
+# Copyright (c) 2003, 2005, 2006, 2008, 2011 Jason Tishler
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -24,7 +24,7 @@ PATH=$(cd $tp2 && pwd):@bindir@:/bin
 ProgramName=${0##*/}
 ProgramOptions='b:o:s:T:v'
 DefaultBaseAddress=0x70000000
-DefaultOffset=0x10000
+DefaultOffset=@DEFAULT_OFFSET_VALUE@
 DefaultVerbose=
 DefaultFileList=
 DefaultSuffixes='dll|so'

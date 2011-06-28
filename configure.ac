@@ -38,6 +38,12 @@ case "$host" in
 esac
 AC_SUBST([LIBOBJS])
 
+case "$host" in
+ *mingw* | *msys* )	DEFAULT_OFFSET_VALUE=0x10000 ;;
+ *)			DEFAULT_OFFSET_VALUE=0 ;;
+esac
+AC_SUBST(DEFAULT_OFFSET_VALUE)
+
 AC_CONFIG_FILES([Makefile
                  imagehelper/Makefile])
 
