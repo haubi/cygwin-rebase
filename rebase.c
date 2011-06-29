@@ -48,6 +48,8 @@ int verbose = 0;
 const char *file_list = 0;
 const char *stdin_file_list = "-";
 
+ULONG ALLOCATION_SLOT;	/* Allocation granularity. */
+
 typedef struct _img_info
 {
   const char *name;
@@ -69,20 +71,33 @@ main (int argc, char *argv[])
 {
   ULONG new_image_base = 0;
   int i = 0;
+  SYSTEM_INFO si;
+  BOOL status;
 
   setlocale (LC_ALL, "");
   parse_args (argc, argv);
   new_image_base = image_base;
+  GetSystemInfo (&si);
+  ALLOCATION_SLOT = si.dwAllocationGranularity;
 
 #ifdef __CYGWIN__
+  /* Fetch the Cygwin DLLs data to make sure that DLLs aren't rebased
+     into the memory area taken by the Cygwin DLL. */
   GetImageInfos ("/bin/cygwin1.dll", &cygwin_dll_image_base,
 				     &cygwin_dll_image_size);
+  /* Take the three shared memory areas preceeding the DLL into account. */
+  cygwin_dll_image_base -= 3 * ALLOCATION_SLOT;
+  /* Add a slack of 8 * 64K at the end of the Cygwin DLL.  This leave a
+     bit of room to install newer, bigger Cygwin DLLs, as well as room to
+     install non-optimized DLLs for debugging purposes.  Otherwise the
+     slightest change might break fork again :-P */
+  cygwin_dll_image_size += 3 * ALLOCATION_SLOT + 8 * ALLOCATION_SLOT;
 #endif
 
   /* Rebase file list, if specified. */
   if (file_list)
     {
-      BOOL status = TRUE;
+      status = TRUE;
       char filename[MAX_PATH + 2];
       FILE *file = file_list_fopen (file_list);
       if (!file)
@@ -105,8 +120,8 @@ main (int argc, char *argv[])
   for (i = args_index; i < argc; i++)
     {
       const char *filename = argv[i];
-      BOOL status = image_info_flag ? collect_image_info (filename)
-				     : rebase (filename, &new_image_base);
+      status = image_info_flag ? collect_image_info (filename)
+				 : rebase (filename, &new_image_base);
       if (!status)
 	exit (2);
     }
@@ -267,11 +282,13 @@ retry:
 
 #ifdef __CYGWIN__
   /* Avoid the case that a DLL is rebased into the address space taken
-     by the Cygwin DLL. */
-  if (*new_image_base >= cygwin_dll_image_base
+     by the Cygwin DLL.  Only test in down_flag == TRUE case, otherwise
+     the return value in new_image_base is not meaningful */
+  if (down_flag
+      && *new_image_base >= cygwin_dll_image_base
       && *new_image_base <= cygwin_dll_image_base + cygwin_dll_image_size)
     {
-      *new_image_base = cygwin_dll_image_base - offset;
+      *new_image_base = cygwin_dll_image_base - new_image_size;
       goto retry;
     }
 #endif

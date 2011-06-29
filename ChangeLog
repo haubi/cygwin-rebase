@@ -1,3 +1,13 @@
+2011-06-29  Corinna Vinschen  <corinna@vinschen.de>
+
+	* rebase.c (ALLOCATION_SLOT): New variable to keep allocation
+	granularity.
+	(main): Define status once at the start of main.  Initialize
+	ALLOCATION_SLOT from system info.  Recalculate cygwin_dll_image_base
+	and cygwin_dll_image_size and add comments to explain why.
+	(rebase): Only check for Cygwin DLL if down_flag is TRUE.  Add comment
+	to explain why.
+
 2011-06-28  Corinna Vinschen  <corinna@vinschen.de>
 
 	* configure.ac (DEFAULT_OFFSET_VALUE): Define host-dependent.
