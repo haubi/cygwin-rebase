@@ -60,7 +60,7 @@ DEFS = @DEFS@ -DVERSION='"$(PACKAGE_VERSION)"' -DLIB_VERSION='"$(LIB_VERSION)"'
 
 override CFLAGS+=-Wall -Werror
 override CXXFLAGS+=-Wall -Werror
-override LDFLAGS+=-static -static-libgcc -static-libstdc++
+override LDFLAGS+=-static -static-libgcc
 
 .SUFFIXES:
 .SUFFIXES: .c .cc .$(O)
@@ -91,7 +91,7 @@ libimagehelper:
 	$(MAKE) -C imagehelper imagehelper
 
 rebase$(EXEEXT): $(REBASE_LIBS) $(REBASE_OBJS)
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $(REBASE_OBJS) $(REBASE_LIBS)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -static-libstdc++ -o $@ $(REBASE_OBJS) $(REBASE_LIBS)
 
 rebase.$(O):: rebase.c Makefile
 

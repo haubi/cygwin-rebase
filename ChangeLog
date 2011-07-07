@@ -1,3 +1,9 @@
+2011-07-07  Corinna Vinschen  <corinna@vinschen.de>
+
+	* Makefile.in (LDFLAGS): Don't override with -static-libstdc++
+	unconditionally.
+	(rebase): Add -static-libstdc++ to link statement.
+
 2011-06-29  Corinna Vinschen  <corinna@vinschen.de>
 
 	* rebase.c (ALLOCATION_SLOT): New variable to keep allocation
