@@ -25,13 +25,14 @@
 #include <locale.h>
 #include <getopt.h>
 #include <string.h>
+#include <inttypes.h>
 #include "imagehelper.h"
 
 BOOL collect_image_info (const char *pathname);
 void print_image_info ();
-BOOL rebase (const char *pathname, ULONG *new_image_base);
+BOOL rebase (const char *pathname, ULONG64 *new_image_base);
 void parse_args (int argc, char *argv[]);
-unsigned long string_to_ulong (const char *string);
+unsigned long long string_to_ulonglong (const char *string);
 void usage ();
 BOOL is_rebaseable (const char *pathname);
 FILE *file_list_fopen (const char *file_list);
@@ -39,7 +40,7 @@ char *file_list_fgets (char *buf, int size, FILE *file);
 int file_list_fclose (FILE *file);
 void version ();
 
-ULONG image_base = 0;
+ULONG64 image_base = 0;
 BOOL down_flag = FALSE;
 BOOL image_info_flag = FALSE;
 ULONG offset = 0;
@@ -53,7 +54,7 @@ ULONG ALLOCATION_SLOT;	/* Allocation granularity. */
 typedef struct _img_info
 {
   const char *name;
-  ULONG base;
+  ULONG64 base;
   ULONG size;
 } img_info_t;
 
@@ -62,14 +63,14 @@ unsigned int img_info_size = 0;
 unsigned int img_info_max_size = 0;
 
 #ifdef __CYGWIN__
-ULONG cygwin_dll_image_base = 0;
+ULONG64 cygwin_dll_image_base = 0;
 ULONG cygwin_dll_image_size = 0;
 #endif
 
 int
 main (int argc, char *argv[])
 {
-  ULONG new_image_base = 0;
+  ULONG64 new_image_base = 0;
   int i = 0;
   SYSTEM_INFO si;
   BOOL status;
@@ -83,8 +84,8 @@ main (int argc, char *argv[])
 #ifdef __CYGWIN__
   /* Fetch the Cygwin DLLs data to make sure that DLLs aren't rebased
      into the memory area taken by the Cygwin DLL. */
-  GetImageInfos ("/bin/cygwin1.dll", &cygwin_dll_image_base,
-				     &cygwin_dll_image_size);
+  GetImageInfos64 ("/bin/cygwin1.dll", NULL,
+		   &cygwin_dll_image_base, &cygwin_dll_image_size);
   /* Take the three shared memory areas preceeding the DLL into account. */
   cygwin_dll_image_base -= 3 * ALLOCATION_SLOT;
   /* Add a slack of 8 * 64K at the end of the Cygwin DLL.  This leave a
@@ -156,8 +157,9 @@ collect_image_info (const char *pathname)
 	}
     }
 
-  if (GetImageInfos (pathname, &img_info_list[img_info_size].base,
-			       &img_info_list[img_info_size].size))
+  if (GetImageInfos64 (pathname, NULL,
+		       &img_info_list[img_info_size].base,
+		       &img_info_list[img_info_size].size))
     img_info_list[img_info_size++].name = strdup (pathname);
   return TRUE;
 }
@@ -165,8 +167,8 @@ collect_image_info (const char *pathname)
 int
 img_info_cmp (const void *a, const void *b)
 {
-  ULONG abase = ((img_info_t *) a)->base;
-  ULONG bbase = ((img_info_t *) b)->base;
+  ULONG64 abase = ((img_info_t *) a)->base;
+  ULONG64 bbase = ((img_info_t *) b)->base;
 
   if (abase < bbase)
     return -1;
@@ -182,16 +184,17 @@ print_image_info ()
 
   qsort (img_info_list, img_info_size, sizeof (img_info_t), img_info_cmp);
   for (i = 0; i < img_info_size; ++i)
-    printf ("%-47s base 0x%08lx size 0x%08lx\n",
+    printf ("%-47s base 0x%08" PRIx64 " size 0x%08lx\n",
 	    img_info_list[i].name,
 	    img_info_list[i].base,
 	    img_info_list[i].size);
 }
 
 BOOL
-rebase (const char *pathname, ULONG *new_image_base)
+rebase (const char *pathname, ULONG64 *new_image_base)
 {
-  ULONG old_image_size, old_image_base, new_image_size, prev_new_image_base;
+  ULONG64 old_image_base, prev_new_image_base;
+  ULONG old_image_size, new_image_size;
   BOOL status, status2;
 
   /* Skip if file does not exist to prevent ReBaseImage() from using it's
@@ -227,17 +230,17 @@ retry:
 
   /* Rebase the image. */
   prev_new_image_base = *new_image_base;
-  status = ReBaseImage ((char*) pathname,	/* CurrentImageName */
-			 "",			/* SymbolPath */
-			 TRUE,			/* fReBase */
-			 FALSE,			/* fRebaseSysfileOk */
-			 down_flag,		/* fGoingDown */
-			 0,			/* CheckImageSize */
-			 &old_image_size,	/* OldImageSize */
-			 &old_image_base,	/* OldImageBase */
-			 &new_image_size,	/* NewImageSize */
-			 new_image_base,	/* NewImageBase */
-			 time (0));		/* TimeStamp */
+  status = ReBaseImage64 ((char*) pathname,	/* CurrentImageName */
+			  "",			/* SymbolPath */
+			  TRUE,			/* fReBase */
+			  FALSE,		/* fRebaseSysfileOk */
+			  down_flag,		/* fGoingDown */
+			  0,			/* CheckImageSize */
+			  &old_image_size,	/* OldImageSize */
+			  &old_image_base,	/* OldImageBase */
+			  &new_image_size,	/* NewImageSize */
+			  new_image_base,	/* NewImageBase */
+			  time (0));		/* TimeStamp */
 
   /* MS's ReBaseImage seems to never return false! */
   status2 = GetLastError ();
@@ -256,17 +259,17 @@ retry:
 	}
 
       /* Retry rebase.*/
-      status = ReBaseImage ((char*) pathname,	/* CurrentImageName */
-			    "",			/* SymbolPath */
-			    TRUE,		/* fReBase */
-			    FALSE,		/* fRebaseSysfileOk */
-			    down_flag,		/* fGoingDown */
-			    0,			/* CheckImageSize */
-			    &old_image_size,	/* OldImageSize */
-			    &old_image_base,	/* OldImageBase */
-			    &new_image_size,	/* NewImageSize */
-			    new_image_base,	/* NewImageBase */
-			    time (0));		/* TimeStamp */
+      status = ReBaseImage64 ((char*) pathname,	/* CurrentImageName */
+			      "",		/* SymbolPath */
+			      TRUE,		/* fReBase */
+			      FALSE,		/* fRebaseSysfileOk */
+			      down_flag,	/* fGoingDown */
+			      0,		/* CheckImageSize */
+			      &old_image_size,	/* OldImageSize */
+			      &old_image_base,	/* OldImageBase */
+			      &new_image_size,	/* NewImageSize */
+			      new_image_base,	/* NewImageBase */
+			      time (0));	/* TimeStamp */
 
       /* MS's ReBaseImage seems to never return false! */
       status2 = GetLastError ();
@@ -296,7 +299,8 @@ retry:
   /* Display rebase results, if verbose. */
   if (verbose)
     {
-      printf ("%s: new base = %lx, new size = %lx\n", pathname,
+      printf ("%s: new base = %" PRIx64 ", new size = %lx\n",
+	      pathname,
 	      ((down_flag) ? *new_image_base : prev_new_image_base),
 	      new_image_size + offset);
     }
@@ -319,7 +323,7 @@ parse_args (int argc, char *argv[])
       switch (anOption)
 	{
 	case 'b':
-	  image_base = string_to_ulong (optarg);
+	  image_base = string_to_ulonglong (optarg);
 	  break;
 	case 'd':
 	  down_flag = TRUE;
@@ -328,7 +332,7 @@ parse_args (int argc, char *argv[])
 	  image_info_flag = TRUE;
 	  break;
 	case 'o':
-	  offset = string_to_ulong (optarg);
+	  offset = string_to_ulonglong (optarg);
 	  break;
 	case 'T':
 	  file_list = optarg;
@@ -357,11 +361,11 @@ parse_args (int argc, char *argv[])
   args_index = optind;
 }
 
-unsigned long
-string_to_ulong (const char *string)
+unsigned long long
+string_to_ulonglong (const char *string)
 {
-  unsigned long number = 0;
-  number = strtoul (string, 0, 0);
+  unsigned long long number = 0;
+  number = strtoull (string, 0, 0);
   return number;
 }
 

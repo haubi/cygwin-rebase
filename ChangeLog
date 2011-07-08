@@ -1,3 +1,16 @@
+2011-07-08  Corinna Vinschen  <corinna@vinschen.de>
+
+	* rebase.c: Convert all base address variables to ULONG64
+	throughout.
+	(main): On Cygwin, call GetImageInfos64 to get Cygwin DLLs
+	data.
+	(print_image_info): Use PRIx64 in printf format string to print
+	addresses.
+	(rebase): Ditto.  Call ReBaseImage64.
+	(parse_args): Call string_to_ulonglong.
+	(string_to_ulonglong): Rename from string_to_ulong, call
+	strtoull, and return unsigned long long.
+
 2011-07-07  Corinna Vinschen  <corinna@vinschen.de>
 
 	* Makefile.in (LDFLAGS): Don't override with -static-libstdc++
