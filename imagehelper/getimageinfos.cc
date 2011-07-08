@@ -27,7 +27,8 @@
 #include "imagehelper.h"
 
 
-BOOL GetImageInfos(LPCSTR filename, ULONG *ImageBase, ULONG *ImageSize)
+BOOL GetImageInfos64(LPCSTR filename, BOOL *is64bit,
+		     ULONG64 *ImageBase, ULONG *ImageSize)
 {
   LinkedObjectFile dll(filename);
 
@@ -39,8 +40,20 @@ BOOL GetImageInfos(LPCSTR filename, ULONG *ImageBase, ULONG *ImageSize)
       return false;
     }
 
-  *ImageBase = dll.getNTHeader()->OptionalHeader.ImageBase;
-  *ImageSize = dll.getNTHeader()->OptionalHeader.SizeOfImage;
+  if (dll.is64bit ())
+    {
+      if (is64bit)
+      	*is64bit = TRUE;
+      *ImageBase = dll.getNTHeader64 ()->OptionalHeader.ImageBase;
+      *ImageSize = dll.getNTHeader64 ()->OptionalHeader.SizeOfImage;
+    }
+  else
+    {
+      if (is64bit)
+	*is64bit = FALSE;
+      *ImageBase = dll.getNTHeader32 ()->OptionalHeader.ImageBase;
+      *ImageSize = dll.getNTHeader32 ()->OptionalHeader.SizeOfImage;
+    }
 
   if (Base::debug)
     std::cerr << "ImageBase: 0x" << std::hex << *ImageBase << " ImageSize: 0x" << std::hex << *ImageSize << std::endl;
@@ -49,3 +62,10 @@ BOOL GetImageInfos(LPCSTR filename, ULONG *ImageBase, ULONG *ImageSize)
   return true;
 }
 
+BOOL GetImageInfos(LPCSTR filename, ULONG *ImageBase, ULONG *ImageSize)
+{
+  ULONG64 base;
+  BOOL ret = GetImageInfos64 (filename, NULL, &base, ImageSize);
+  *ImageBase = (ULONG) base;
+  return ret;
+}

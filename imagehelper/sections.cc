@@ -30,7 +30,8 @@ int Base::debug = 0;
 Section::Section(void *aFileBase, SectionHeader *p)
 {
   header = p;
-  adjust = (uint)header->PointerToRawData + (uint) aFileBase - header->VirtualAddress;
+  adjust = (uintptr_t) header->PointerToRawData
+	   + (uintptr_t) aFileBase - header->VirtualAddress;
   strncpy(Name,(char *)header->Name,8);
   Name[8] = '\0';
 }
@@ -71,11 +72,20 @@ bool Section::isIn(uint addr)
 SectionList::SectionList(void *aFileBase)
 {
   PIMAGE_DOS_HEADER dosheader = (PIMAGE_DOS_HEADER) aFileBase;
-  PIMAGE_NT_HEADERS ntheader = (PIMAGE_NT_HEADERS) ((char *)dosheader + dosheader->e_lfanew);
+  PIMAGE_NT_HEADERS32 ntheader32 = (PIMAGE_NT_HEADERS32) ((char *)dosheader + dosheader->e_lfanew);
+  PIMAGE_NT_HEADERS64 ntheader64 = (PIMAGE_NT_HEADERS64) ntheader32;
 
-  header = (SectionHeader *) (ntheader+1);
-  FileBase = (uint) aFileBase;
-  count = ntheader->FileHeader.NumberOfSections;
+  FileBase = (uintptr_t) aFileBase;
+  if (ntheader32->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC)
+    {
+      header = (SectionHeader *) (ntheader64+1);
+      count = ntheader64->FileHeader.NumberOfSections;
+    }
+  else
+    {
+      header = (SectionHeader *) (ntheader32+1);
+      count = ntheader32->FileHeader.NumberOfSections;
+    }
   for (int i = 0; i < count; i++)
     {
       sections[i] = new Section(aFileBase,&header[i]);
@@ -291,7 +301,7 @@ bool Relocations::check(void)
     {
       int NumOfRelocs = (relocp->SizeOfBlock - sizeof(IMAGE_BASE_RELOCATION)) / sizeof (WORD);
       int va = relocp->VirtualAddress;
-      PWORD p = (PWORD)((unsigned int )relocp + sizeof(IMAGE_BASE_RELOCATION));
+      PWORD p = (PWORD)((uintptr_t)relocp + sizeof(IMAGE_BASE_RELOCATION));
 	    if (debug)
 	      	std::cerr << "debug: blocksize= " << std::dec << NumOfRelocs << std::endl;
 
@@ -367,7 +377,7 @@ bool Relocations::relocate(int difference)
     {
       int NumOfRelocs = (relocp->SizeOfBlock - sizeof(IMAGE_BASE_RELOCATION)) / sizeof (WORD);
       int va = relocp->VirtualAddress;
-      PWORD p = (PWORD)((unsigned int )relocp + sizeof(IMAGE_BASE_RELOCATION));
+      PWORD p = (PWORD)((uintptr_t)relocp + sizeof(IMAGE_BASE_RELOCATION));
       if (debug)
         {
           std::cerr << "VirtAdress: 0x" \

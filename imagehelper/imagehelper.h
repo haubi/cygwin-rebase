@@ -27,6 +27,20 @@
 extern "C" {
 #endif
 
+BOOL ReBaseImage64(
+  LPCSTR CurrentImageName,
+  LPCSTR SymbolPath,       // ignored
+  BOOL fReBase,
+  BOOL fRebaseSysfileOk,   // ignored
+  BOOL fGoingDown,
+  ULONG CheckImageSize,    // ignored
+  ULONG *OldImageSize,
+  ULONG64 *OldImageBase,
+  ULONG *NewImageSize,
+  ULONG64 *NewImageBase,
+  ULONG TimeStamp
+);
+
 BOOL ReBaseImage(
   LPCSTR CurrentImageName,
   LPCSTR SymbolPath,       // ignored
@@ -64,7 +78,7 @@ typedef enum _IMAGEHLP_STATUS_REASON {
   BindSymbolsNotUpdated
 } IMAGEHLP_STATUS_REASON;
 
-typedef BOOL(STDCALL*PIMAGEHLP_STATUS_ROUTINE)(IMAGEHLP_STATUS_REASON,LPSTR,LPSTR,ULONG,ULONG);
+typedef BOOL(__stdcall *PIMAGEHLP_STATUS_ROUTINE)(IMAGEHLP_STATUS_REASON,LPSTR,LPSTR,ULONG,ULONG);
 
 BOOL BindImageEx(
   DWORD Flags,
@@ -73,6 +87,13 @@ BOOL BindImageEx(
   LPCSTR SymbolPath,
   PIMAGEHLP_STATUS_ROUTINE
   StatusRoutine
+);
+
+BOOL GetImageInfos64(
+  LPCSTR ImageName,
+  BOOL *is64bit,
+  ULONG64 *ImageBase,
+  ULONG *ImageSize
 );
 
 BOOL GetImageInfos(

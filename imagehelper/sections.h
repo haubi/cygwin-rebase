@@ -135,7 +135,7 @@ class SectionList : public Base
     Section *getNext(void);
 
   private:
-    uint FileBase;
+    uintptr_t FileBase;
     SectionHeader *header;
     Section *sections[SECTIONLIST_MAXSECTIONS];
     int count;

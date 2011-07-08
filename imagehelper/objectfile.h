@@ -35,7 +35,12 @@ class ObjectFile : public Base
       return FileName;
     }
 
-    PIMAGE_NT_HEADERS getNTHeader(void)
+    PIMAGE_NT_HEADERS64 getNTHeader64 (void)
+    {
+      return (PIMAGE_NT_HEADERS64) ntheader;
+    }
+
+    PIMAGE_NT_HEADERS32 getNTHeader32 (void)
     {
       return ntheader;
     }
@@ -43,6 +48,16 @@ class ObjectFile : public Base
     bool isLoaded(void)
     {
       return Error == 0;
+    }
+
+    bool is64bit(void)
+    {
+      return is64bit_img;
+    }
+
+    bool is32bit(void)
+    {
+      return !is64bit_img;
     }
 
     int getError(void)
@@ -63,11 +78,14 @@ class ObjectFile : public Base
     HANDLE hfile;
     HANDLE hfilemapping;
     LPVOID lpFileBase;
-    PIMAGE_NT_HEADERS ntheader;
     SectionList *sections;
-    uint ImageBase;
+    ULONG64 ImageBase;
     int Error;
     bool isWritable;
+
+  private:
+    PIMAGE_NT_HEADERS32 ntheader;
+    bool is64bit_img;
   };
 
 class ObjectFileList;

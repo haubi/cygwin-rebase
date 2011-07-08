@@ -40,12 +40,12 @@ Win32Path(const char *s)
   if (!s || *s == '\0')
     return L"";
 #if !defined (__CYGWIN__)
-  MultiByteToWideChar (CP_OEM, 0, s, -1, w32_pbuf, 32768);
+  MultiByteToWideChar (CP_OEMCP, 0, s, -1, w32_pbuf, 32768);
 #elif defined(__MSYS__)
   {
     char buf[MAX_PATH];
     cygwin_conv_to_win32_path(s, buf);
-    MultiByteToWideChar (CP_OEM, 0, buf, -1, w32_pbuf, 32768);
+    MultiByteToWideChar (CP_OEMCP, 0, buf, -1, w32_pbuf, 32768);
   }
 #else
   cygwin_conv_path (CCP_POSIX_TO_WIN_W, s, w32_pbuf, 32768 * sizeof (WCHAR));
@@ -123,7 +123,7 @@ ObjectFile::ObjectFile(const char *aFileName, bool writeable)
   // create shortcuts
   PIMAGE_DOS_HEADER dosheader = (PIMAGE_DOS_HEADER)lpFileBase;
 
-  ntheader = (PIMAGE_NT_HEADERS) ((char *)dosheader + dosheader->e_lfanew);
+  ntheader = (PIMAGE_NT_HEADERS32) ((char *)dosheader + dosheader->e_lfanew);
 
   if (ntheader->Signature != 0x00004550)
     {
@@ -131,9 +131,13 @@ ObjectFile::ObjectFile(const char *aFileName, bool writeable)
       return;
     }
 
+  is64bit_img = ntheader->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC;
+
   sections = new SectionList(lpFileBase);
 
-  ImageBase = ntheader->OptionalHeader.ImageBase;
+  ImageBase = is64bit_img
+	      ? getNTHeader64 ()->OptionalHeader.ImageBase
+	      : getNTHeader32 ()->OptionalHeader.ImageBase;
 
   Error = 0;
 }
@@ -175,18 +179,35 @@ LinkedObjectFile::LinkedObjectFile(const char *aFileName, bool writable) : Objec
       << std::hex << ImageBase << std::dec << std::endl;
     }
 
+  PIMAGE_NT_HEADERS32 ntheader32 = getNTHeader32 ();
+  PIMAGE_NT_HEADERS64 ntheader64 = getNTHeader64 ();
+
   Section *edata = sections->find(".edata");
   if (edata)
     exports = new Exports(*edata);
   else
-    exports = new Exports(*sections,(DataDirectory *)&ntheader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT]);
+    {
+      DataDirectory *dir;
+      if (is64bit ())
+	dir = (DataDirectory *) &ntheader64->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT];
+      else
+	dir = (DataDirectory *) &ntheader32->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT];
+      exports = new Exports(*sections, dir);
+    }
 
 
   Section *idata = sections->find(".idata");
   if (idata)
     imports = new Imports(*idata);
   else
-    imports = new Imports(*sections,(DataDirectory *)&ntheader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT]);
+    {
+      DataDirectory *dir;
+      if (is64bit ())
+	dir = (DataDirectory *)&ntheader64->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
+      else
+	dir = (DataDirectory *)&ntheader32->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
+      imports = new Imports(*sections, dir);
+    }
 
 
 
@@ -282,13 +303,33 @@ bool LinkedObjectFile::rebind(ObjectFileList &cache)
       p->TimeDateStamp = 0xffffffff;
       p->ForwarderChain = 0xffffffff;
     }
-  ntheader->FileHeader.TimeDateStamp = time(0);
+
+  PIMAGE_NT_HEADERS32 ntheader32 = getNTHeader32 ();
+  PIMAGE_NT_HEADERS64 ntheader64 = getNTHeader64 ();
+
+  if (is64bit ())
+    ntheader64->FileHeader.TimeDateStamp = time(0);
+  else
+    ntheader32->FileHeader.TimeDateStamp = time(0);
 
 #if 1
   // fill bound import section
-  DataDirectory *bdp = (DataDirectory *)&ntheader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_BOUND_IMPORT];
-  SectionHeader *first_section = (SectionHeader *)(ntheader+1);
-  BoundImportDescriptor *bp_org = (BoundImportDescriptor *)(&first_section[ntheader->FileHeader.NumberOfSections]);
+  DataDirectory *bdp;
+  SectionHeader *first_section;
+  BoundImportDescriptor *bp_org;
+  
+  if (is64bit ())
+    {
+      bdp = (DataDirectory *)&ntheader64->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_BOUND_IMPORT];
+      first_section = (SectionHeader *)(ntheader64+1);
+      bp_org = (BoundImportDescriptor *)(&first_section[ntheader64->FileHeader.NumberOfSections]);
+    }
+  else
+    {
+      bdp = (DataDirectory *)&ntheader32->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_BOUND_IMPORT];
+      first_section = (SectionHeader *)(ntheader32+1);
+      bp_org = (BoundImportDescriptor *)(&first_section[ntheader32->FileHeader.NumberOfSections]);
+    }
   BoundImportDescriptor *bp = bp_org;
   char *bp2 = (char *)&bp[cache.getCount() + 1];
 
@@ -297,7 +338,7 @@ bool LinkedObjectFile::rebind(ObjectFileList &cache)
   while ((obj = (LinkedObjectFile *)cache.getNext()) != NULL)
     {
       bp->TimeDateStamp = time(0);
-      bp->OffsetModuleName = (uint)bp2 - (uint)bp_org;
+      bp->OffsetModuleName = (uintptr_t) bp2 - (uintptr_t) bp_org;
       // bp->Reserved
       bp->NumberOfModuleForwarderRefs = 0;
       bp++;
@@ -313,8 +354,8 @@ bool LinkedObjectFile::rebind(ObjectFileList &cache)
   bp->NumberOfModuleForwarderRefs = 0;
 
   // set data directory entry
-  bdp->VirtualAddress = (uint) bp_org - (uint)lpFileBase;
-  bdp->Size = (uint) bp2 - (uint) bp_org;
+  bdp->VirtualAddress = (uintptr_t) bp_org - (uintptr_t) lpFileBase;
+  bdp->Size = (uintptr_t) bp2 - (uintptr_t) bp_org;
 #endif
   return true;
 }
@@ -392,10 +433,18 @@ bool LinkedObjectFile::unbind(void)
       p->TimeDateStamp = 0;
       p->ForwarderChain = 0;
     }
-  ntheader->FileHeader.TimeDateStamp = time(0);
+  if (is64bit ())
+    getNTHeader64 ()->FileHeader.TimeDateStamp = time(0);
+  else
+    getNTHeader32 ()->FileHeader.TimeDateStamp = time(0);
 
   // fill bound import section
-  DataDirectory *bdp = (DataDirectory *)&ntheader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_BOUND_IMPORT];
+  DataDirectory *bdp;
+  
+  if (is64bit ())
+    bdp = (DataDirectory *) &getNTHeader64 ()->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_BOUND_IMPORT];
+  else
+    bdp = (DataDirectory *) &getNTHeader32 ()->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_BOUND_IMPORT];
 
   // set data directory entry
   bdp->VirtualAddress = 0;

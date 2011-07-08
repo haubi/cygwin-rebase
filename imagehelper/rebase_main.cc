@@ -44,7 +44,7 @@ void ParseArgs(int argc, char* argv[]);
 unsigned long StringToUlong(const string& aString);
 void Usage();
 
-ULONG theImageBase = 0;
+ULONG64 theImageBase = 0;
 BOOL theDownFlag = FALSE;
 bool theDebugFlag = false;
 BOOL theCheckFlag = FALSE;
@@ -58,15 +58,16 @@ int
 main(int argc, char* argv[])
 {
   ParseArgs(argc, argv);
-  ULONG aNewImageBase = theImageBase;
+  ULONG64 aNewImageBase = theImageBase;
 
   for (int i = theArgsIndex; i < argc; i++)
     {
       string aFile = PosixToWin32(argv[i]);
       if (theListFlag)
         {
-          ULONG ImageBase, ImageSize;
-          GetImageInfos(const_cast<LPSTR>(aFile.c_str()),&ImageBase,&ImageSize);
+          ULONG64 ImageBase;
+          ULONG ImageSize;
+          GetImageInfos64(const_cast<LPSTR>(aFile.c_str()),&ImageBase,&ImageSize);
           cout << aFile << ": " << "ImageBase: 0x" << hex << ImageBase << " ImageSize: 0x" << hex << ImageSize << endl;
         }
       else if (theCheckFlag)
@@ -82,20 +83,20 @@ main(int argc, char* argv[])
           if (theDownFlag)
             aNewImageBase -= theOffset;
 
-          ULONG anOldImageSize, anOldImageBase, aNewImageSize;
-          ULONG aPrevNewImageBase = aNewImageBase;
-          BOOL aStatus = ReBaseImage(
-                           const_cast<char*>(aFile.c_str()), // CurrentImageName
-                           0, // SymbolPath
-                           TRUE, // fReBase
-                           FALSE, // fRebaseSysfileOk
-                           theDownFlag, // fGoingDown
-                           0, // CheckImageSize
-                           &anOldImageSize, // OldImageSize
-                           &anOldImageBase, // OldImageBase
-                           &aNewImageSize, // NewImageSize
-                           &aNewImageBase, // NewImageBase
-                           time(0)); // TimeStamp
+          ULONG anOldImageSize, aNewImageSize;
+          ULONG64 anOldImageBase;
+          ULONG64 aPrevNewImageBase = aNewImageBase;
+          ReBaseImage64(const_cast<char*>(aFile.c_str()), // CurrentImageName
+			0, // SymbolPath
+			TRUE, // fReBase
+			FALSE, // fRebaseSysfileOk
+			theDownFlag, // fGoingDown
+			0, // CheckImageSize
+			&anOldImageSize, // OldImageSize
+			&anOldImageBase, // OldImageBase
+			&aNewImageSize, // NewImageSize
+			&aNewImageBase, // NewImageBase
+			time(0)); // TimeStamp
 
           // ReBaseImage seems to never returns false!
           DWORD aStatus2 = GetLastError();

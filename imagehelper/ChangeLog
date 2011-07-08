@@ -1,3 +1,38 @@
+2011-07-08  Corinna Vinschen  <corinna@vinschen.de>
+
+	Allow to work with 64 bit images and make code 64 bit clean.
+	* getimageinfos.cc (GetImageInfos64); New function, take over
+	functionality from GetImageInfos and handle 32 and 64 bit images.
+	(GetImageInfos): Just call GetImageInfos64.
+	* imagehelper.h (ReBaseImage64): Declare.
+	(GetImageInfos64): Declare.
+	* objectfile.cc (Win32Path): Fix codepage to CP_OEMCP.
+	(ObjectFile::ObjectFile): Set new is64bit_img flag.  Set ImageBase
+	according to address size of platform.
+	(LinkedObjectFile::LinkedObjectFile): Handle 64 bit images.
+	(LinkedObjectFile::rebind): Ditto.  Use uintptr_t rather than uint.
+	(LinkedObjectFile::unbind): Ditto.
+	* objectfile.h (ObjectFile::getNTHeader): Remove.
+	(ObjectFile::getNTHeader64): New method.
+	(ObjectFile::getNTHeader32): New method.
+	(ObjectFile::is64bit): New method.
+	(ObjectFile::is32bit): New method.
+	(ObjectFile::ImageBase): Convert to ULONG64.
+	(ObjectFile::ntheader): Change type to PIMAGE_NT_HEADERS32
+	and make private.
+	(ObjectFile::is64bit_img): New private BOOL member.
+	* rebase_main.cc: Convert all base variables to ULONG64 and
+	call ReBaseImage64.
+	* rebaseimage.cc (ReBaseImage64): New function, take over
+	functionality from ReBaseImage and handle 32 and 64 bit images.
+	(ReBaseImage): Just call ReBaseImage64.
+	* rebind_main.cc (main): Drop unused variables.
+	* sections.cc (Section::Section): Use uintptr_t rather than uint.
+	(Section::isIn): Handle 64 bit images.
+	(Relocations::check): Use uintptr_t rather than uint.
+	(Relocations::relocate): Ditto.
+	* sections.h (SectionList::FileBase): Convert to uintptr_t.
+
 2011-06-21  Corinna Vinschen  <corinna@vinschen.de>
 
 	Throughout, avoid all compiler warnings.

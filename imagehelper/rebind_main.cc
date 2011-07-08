@@ -67,9 +67,6 @@ main(int argc, char* argv[])
 
   for (int i= 1; i < argc; i++)
     {
-      char *a = argv[i];
-      char *b = NULL;
-      char *c = NULL;
       LinkedObjectFile dll(argv[i]);
       // FIXME: add this stuff
       // dll.checkRelocations();

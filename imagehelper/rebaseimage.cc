@@ -24,7 +24,7 @@
 #include "objectfile.h"
 #include "imagehelper.h"
 
-BOOL ReBaseImage(
+BOOL ReBaseImage64 (
   LPCSTR CurrentImageName,
   LPCSTR SymbolPath,       // ignored
   BOOL fReBase,
@@ -32,9 +32,9 @@ BOOL ReBaseImage(
   BOOL fGoingDown,
   ULONG CheckImageSize,    // ignored
   ULONG *OldImageSize,
-  ULONG *OldImageBase,
+  ULONG64 *OldImageBase,
   ULONG *NewImageSize,
-  ULONG *NewImageBase,
+  ULONG64 *NewImageBase,
   ULONG TimeStamp
 )
 {
@@ -60,12 +60,22 @@ BOOL ReBaseImage(
       return false;
     }
 
-  PIMAGE_NT_HEADERS ntheader = dll.getNTHeader();
+  PIMAGE_NT_HEADERS32 ntheader32 = dll.getNTHeader32 ();
+  PIMAGE_NT_HEADERS64 ntheader64 = dll.getNTHeader64 ();
 
   // set new header elements
-  *OldImageBase = ntheader->OptionalHeader.ImageBase;
-  *OldImageSize = ntheader->OptionalHeader.SizeOfImage;
-  *NewImageSize = ntheader->OptionalHeader.SizeOfImage;
+  if (dll.is64bit ())
+    {
+      *OldImageBase = ntheader64->OptionalHeader.ImageBase;
+      *OldImageSize = ntheader64->OptionalHeader.SizeOfImage;
+      *NewImageSize = ntheader64->OptionalHeader.SizeOfImage;
+    }
+  else
+    {
+      *OldImageBase = ntheader32->OptionalHeader.ImageBase;
+      *OldImageSize = ntheader32->OptionalHeader.SizeOfImage;
+      *NewImageSize = ntheader32->OptionalHeader.SizeOfImage;
+    }
 
   // Round NewImageSize to be consistent with MS's rebase.
   const ULONG imageSizeGranularity = 0x10000;
@@ -77,7 +87,8 @@ BOOL ReBaseImage(
     *NewImageBase -= *NewImageSize;
 
   // already rebased
-  if (ntheader->OptionalHeader.ImageBase == *NewImageBase)
+  if ((dll.is64bit () && ntheader64->OptionalHeader.ImageBase == *NewImageBase)
+      || (dll.is32bit () && ntheader32->OptionalHeader.ImageBase == *NewImageBase))
     {
       if (!fGoingDown)
         *NewImageBase += *NewImageSize;
@@ -87,8 +98,16 @@ BOOL ReBaseImage(
       return true;
     }
 
-  ntheader->OptionalHeader.ImageBase = *NewImageBase;
-  ntheader->FileHeader.TimeDateStamp = TimeStamp;
+  if (dll.is64bit ())
+    {
+      ntheader64->OptionalHeader.ImageBase = *NewImageBase;
+      ntheader64->FileHeader.TimeDateStamp = TimeStamp;
+    }
+  else
+    {
+      ntheader32->OptionalHeader.ImageBase = *NewImageBase;
+      ntheader32->FileHeader.TimeDateStamp = TimeStamp;
+    }
 
   int difference = *NewImageBase - *OldImageBase;
 
@@ -105,4 +124,29 @@ BOOL ReBaseImage(
 
   SetLastError(NO_ERROR);
   return true;
+}
+
+BOOL ReBaseImage (
+  LPCSTR CurrentImageName,
+  LPCSTR SymbolPath,       // ignored
+  BOOL fReBase,
+  BOOL fRebaseSysfileOk,   // ignored
+  BOOL fGoingDown,
+  ULONG CheckImageSize,    // ignored
+  ULONG *OldImageSize,
+  ULONG *OldImageBase,
+  ULONG *NewImageSize,
+  ULONG *NewImageBase,
+  ULONG TimeStamp
+)
+{
+  ULONG64 old_base = *OldImageBase;
+  ULONG64 new_base = *NewImageBase;
+  BOOL ret = ReBaseImage64 (CurrentImageName, SymbolPath, fReBase,
+			    fRebaseSysfileOk, fGoingDown, CheckImageSize,
+			    OldImageSize, &old_base, NewImageSize, &new_base,
+			    TimeStamp);
+  *OldImageBase = (ULONG) old_base;
+  *NewImageBase = (ULONG) new_base;
+  return ret;
 }
