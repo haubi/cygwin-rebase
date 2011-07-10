@@ -1,3 +1,13 @@
+2011-07-10  Corinna Vinschen  <corinna@vinschen.de>
+
+	* getimageinfos.cc (GetImageInfos64): Return machine type rather than
+	just a 32/64 bit flag.
+	* imagehelper.h (GetImageInfos64): Ditto in declaration.
+	* objectfile.h (ObjectFile::machine_type): New private variable.
+	(ObjectFile::machine): New method.
+	* objectfile.cc (ObjectFile::ObjectFile): Set machine_type from file
+	header.
+
 2011-07-08  Corinna Vinschen  <corinna@vinschen.de>
 
 	Allow to work with 64 bit images and make code 64 bit clean.

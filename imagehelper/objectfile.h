@@ -60,6 +60,11 @@ class ObjectFile : public Base
       return !is64bit_img;
     }
 
+    WORD machine(void)
+    {
+      return machine_type;
+    }
+
     int getError(void)
     {
       return Error;
@@ -86,6 +91,7 @@ class ObjectFile : public Base
   private:
     PIMAGE_NT_HEADERS32 ntheader;
     bool is64bit_img;
+    WORD machine_type;
   };
 
 class ObjectFileList;

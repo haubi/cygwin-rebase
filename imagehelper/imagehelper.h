@@ -91,7 +91,7 @@ BOOL BindImageEx(
 
 BOOL GetImageInfos64(
   LPCSTR ImageName,
-  BOOL *is64bit,
+  WORD *machine,
   ULONG64 *ImageBase,
   ULONG *ImageSize
 );

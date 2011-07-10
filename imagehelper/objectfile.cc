@@ -132,6 +132,7 @@ ObjectFile::ObjectFile(const char *aFileName, bool writeable)
     }
 
   is64bit_img = ntheader->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC;
+  machine_type = ntheader->FileHeader.Machine;
 
   sections = new SectionList(lpFileBase);
 
