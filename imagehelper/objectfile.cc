@@ -122,9 +122,24 @@ ObjectFile::ObjectFile(const char *aFileName, bool writeable)
 
   // create shortcuts
   PIMAGE_DOS_HEADER dosheader = (PIMAGE_DOS_HEADER)lpFileBase;
-
   ntheader = (PIMAGE_NT_HEADERS32) ((char *)dosheader + dosheader->e_lfanew);
 
+  // basic file sanity checks to avoid crashes.
+  
+  // is it an executable at all?
+  if (dosheader->e_magic != 0x5a4d)	/* "MZ" */
+    {
+      Error = 4;
+      return;
+    }
+  // filesize big enough to allow at least reading the NT header?
+  if (GetFileSize (hfile, NULL)
+      < (char *) ntheader - (char *) dosheader + sizeof *ntheader)
+    {
+      Error = 4;
+      return;
+    }
+  // correct signature for a PE file?
   if (ntheader->Signature != 0x00004550)
     {
       Error = 4;

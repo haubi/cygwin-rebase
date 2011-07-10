@@ -1,5 +1,10 @@
 2011-07-10  Corinna Vinschen  <corinna@vinschen.de>
 
+	* objectfile.cc (ObjectFile::ObjectFile): Add basic executable file
+	checks to avoid crashes.
+
+2011-07-10  Corinna Vinschen  <corinna@vinschen.de>
+
 	* getimageinfos.cc (GetImageInfos64): Return machine type rather than
 	just a 32/64 bit flag.
 	* imagehelper.h (GetImageInfos64): Ditto in declaration.
