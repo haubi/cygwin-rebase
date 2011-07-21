@@ -1,3 +1,46 @@
+2011-07-21  Corinna Vinschen  <corinna@vinschen.de>
+
+	* Makefile.in (DEFS): Add define for sysconfdir.
+	(edit): Add substitute expression for sysconfdir.
+	* rebase.c: Implement rebase database.
+	(roundup): Define.
+	(roundup2): Define.
+	(machine): New global variable to keep requested machine type.
+	(image_storage_flag): New flag.
+	(force_rebase_flag): Ditto.
+	(quite): Ditto.
+	(verbose): Convert to type BOOL.
+	(progname): New variable for printing application name in error output.
+	(img_info_hdr_t): New type.
+	(img_info_t): De-const name.  Add name_size, slot_size, and
+	flag members.
+	(IMG_INFO_FILE_I386): Define database name for i386 systems.
+	(IMG_INFO_FILE_AMD64): Define database name for x86_64 systems.
+	(IMG_INFO_FILE): Define default database name.
+	(gen_progname): New function to initialize progname.
+	(main): Call gen_progname.  Only fetch Cygwin DLL info in 32 bit mode
+	for now.  Always collect file info, then rebase dependent on mode.
+	In database mode, call load_image_info, collect_image_info,
+	merge_image_info, and save_image_info.
+	(img_info_name_cmp): New comparison function.
+	(save_image_info): New function to save rebase database.
+	(load_image_info): New function to load rebase database.
+	(merge_image_info): New function to compute rebase values.
+	(collect_image_info): Fix typo in condition.  Check for rebaseable
+	file here.  Convert given filename to absolute pathname.
+	(print_image_info): Revamp to take database into account.  Add
+	collision information.
+	(rebase): Take down_flag as parameter to allow influencing the
+	algorithm from caller.  Drop call to is_rebaseable here.
+	(long_options): New option array for getopt_long.
+	(short_options): Hold short options.
+	(parse_args): Drop anOptions.  Rename anOption to opt.  Call
+	getopt_long.  Handle all new flags.
+	(usage): Change to reflect new flags.
+	(help): New function.
+	* rebaseall.in: Use database mode.  Add -4 and -8 options and
+	handle 32 and 64 bit modes.
+
 2011-07-08  Corinna Vinschen  <corinna@vinschen.de>
 
 	* rebase.c: Convert all base address variables to ULONG64

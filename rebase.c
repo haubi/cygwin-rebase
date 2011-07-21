@@ -19,6 +19,9 @@
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#if defined(__CYGWIN__) || defined(__MSYS__)
+#include <sys/cygwin.h>
+#endif
 #include <fcntl.h>
 #include <string.h>
 #include <unistd.h>
@@ -26,142 +29,227 @@
 #include <getopt.h>
 #include <string.h>
 #include <inttypes.h>
+#include <errno.h>
 #include "imagehelper.h"
 
+#define roundup(x,y)	((((x) + ((y) - 1)) / (y)) * (y))
+#define roundup2(x,y)	(((x) + (y) - 1) & ~((y) - 1))
+
+BOOL save_image_info ();
+BOOL load_image_info ();
+BOOL merge_image_info ();
 BOOL collect_image_info (const char *pathname);
 void print_image_info ();
-BOOL rebase (const char *pathname, ULONG64 *new_image_base);
+BOOL rebase (const char *pathname, ULONG64 *new_image_base, BOOL down_flag);
 void parse_args (int argc, char *argv[]);
 unsigned long long string_to_ulonglong (const char *string);
 void usage ();
+void help ();
 BOOL is_rebaseable (const char *pathname);
 FILE *file_list_fopen (const char *file_list);
 char *file_list_fgets (char *buf, int size, FILE *file);
 int file_list_fclose (FILE *file);
 void version ();
 
+#ifdef __x86_64__
+WORD machine = IMAGE_FILE_MACHINE_AMD64;
+#else
+WORD machine = IMAGE_FILE_MACHINE_I386;
+#endif
 ULONG64 image_base = 0;
 BOOL down_flag = FALSE;
 BOOL image_info_flag = FALSE;
+BOOL image_storage_flag = FALSE;
+BOOL force_rebase_flag = FALSE;
 ULONG offset = 0;
 int args_index = 0;
-int verbose = 0;
+BOOL verbose = FALSE;
+BOOL quiet = FALSE;
 const char *file_list = 0;
 const char *stdin_file_list = "-";
 
+const char *progname;
+
+const char IMG_INFO_MAGIC[4] = "rBiI";
+const ULONG IMG_INFO_VERSION = 1;
+
 ULONG ALLOCATION_SLOT;	/* Allocation granularity. */
+
+#pragma pack (push, 4)
+
+typedef struct _img_info_hdr
+{
+  CHAR    magic[4];	/* Always IMG_INFO_MAGIC.                            */
+  WORD    machine;	/* IMAGE_FILE_MACHINE_I386/IMAGE_FILE_MACHINE_AMD64  */
+  WORD    version;	/* Database version, always set to IMG_INFO_VERSION. */
+  ULONG64 base;		/* Base address (-b) used to generate database.      */
+  ULONG   offset;	/* Offset (-o) used to generate database.            */
+  BOOL    down_flag;	/* Always TRUE right now.                            */
+  ULONG   count;	/* Number of img_info_t entries following header.    */
+} img_info_hdr_t;
 
 typedef struct _img_info
 {
-  const char *name;
-  ULONG64 base;
-  ULONG size;
+  union {
+    PCHAR   name;	/* Absolute path to DLL.  The strings are stored     */
+    ULONG64 _filler;	/* right after the img_info_t table, in the same     */
+  };			/* order as the img_info_t entries.                  */
+  ULONG   name_size;	/* Length of name string including trailing NUL.     */
+  ULONG64 base;		/* Base address the DLL has been rebased to.         */
+  ULONG   size;		/* Size of the DLL at rebased time.                  */
+  ULONG   slot_size;	/* Size of the DLL rounded to allocation granularity.*/
+  struct {		/* Flags                                             */
+    unsigned needs_rebasing : 1; /* Set to 0 in the database.  Used only     */
+    				 /* while rebasing.                          */
+  } flag;
 } img_info_t;
+
+#pragma pack (pop)
 
 img_info_t *img_info_list = NULL;
 unsigned int img_info_size = 0;
+unsigned int img_info_rebase_start = 0;
 unsigned int img_info_max_size = 0;
+
+#if !defined (__CYGWIN__) && !defined (__MSYS__)
+#undef SYSCONFDIR
+#define SYSCONFDIR "/../etc"
+#endif
+#define IMG_INFO_FILE_I386 SYSCONFDIR "/rebase.db.i386"
+#define IMG_INFO_FILE_AMD64 SYSCONFDIR "/rebase.db.x86_64"
+#ifdef __x86_64__
+#define IMG_INFO_FILE IMG_INFO_FILE_AMD64
+#else
+#define IMG_INFO_FILE IMG_INFO_FILE_I386
+#endif
+char *db_file = IMG_INFO_FILE;
+char tmp_file[] =     SYSCONFDIR "/rebase.db.XXXXXX";
 
 #ifdef __CYGWIN__
 ULONG64 cygwin_dll_image_base = 0;
 ULONG cygwin_dll_image_size = 0;
 #endif
 
+void
+gen_progname (const char *arg0)
+{
+  char *p;
+
+  p = strrchr (arg0, '/');
+  if (!p)
+    p = strrchr (arg0, '\\');
+  progname = p ? p + 1 : arg0;
+  if ((p = strrchr (progname, '.')) && !strcmp (p, ".exe"))
+    *p = 0;
+}
+
 int
 main (int argc, char *argv[])
 {
-  ULONG64 new_image_base = 0;
   int i = 0;
   SYSTEM_INFO si;
   BOOL status;
 
   setlocale (LC_ALL, "");
+  gen_progname (argv[0]);
   parse_args (argc, argv);
-  new_image_base = image_base;
   GetSystemInfo (&si);
   ALLOCATION_SLOT = si.dwAllocationGranularity;
 
+  /* If database support has been requested, load database. */
+  if (image_storage_flag)
+    {
+      if (load_image_info () < 0)
+      	return 2;
+      img_info_rebase_start = img_info_size;
+    }
+
 #ifdef __CYGWIN__
-  /* Fetch the Cygwin DLLs data to make sure that DLLs aren't rebased
-     into the memory area taken by the Cygwin DLL. */
-  GetImageInfos64 ("/bin/cygwin1.dll", NULL,
-		   &cygwin_dll_image_base, &cygwin_dll_image_size);
-  /* Take the three shared memory areas preceeding the DLL into account. */
-  cygwin_dll_image_base -= 3 * ALLOCATION_SLOT;
-  /* Add a slack of 8 * 64K at the end of the Cygwin DLL.  This leave a
-     bit of room to install newer, bigger Cygwin DLLs, as well as room to
-     install non-optimized DLLs for debugging purposes.  Otherwise the
-     slightest change might break fork again :-P */
-  cygwin_dll_image_size += 3 * ALLOCATION_SLOT + 8 * ALLOCATION_SLOT;
+  if (machine == IMAGE_FILE_MACHINE_I386)
+    {
+      /* Fetch the Cygwin DLLs data to make sure that DLLs aren't rebased
+	 into the memory area taken by the Cygwin DLL. */
+      GetImageInfos64 ("/bin/cygwin1.dll", NULL,
+		       &cygwin_dll_image_base, &cygwin_dll_image_size);
+      /* Take the three shared memory areas preceeding the DLL into account. */
+      cygwin_dll_image_base -= 3 * ALLOCATION_SLOT;
+      /* Add a slack of 8 * 64K at the end of the Cygwin DLL.  This leave a
+	 bit of room to install newer, bigger Cygwin DLLs, as well as room to
+	 install non-optimized DLLs for debugging purposes.  Otherwise the
+	 slightest change might break fork again :-P */
+      cygwin_dll_image_size += 3 * ALLOCATION_SLOT + 8 * ALLOCATION_SLOT;
+    }
 #endif
 
-  /* Rebase file list, if specified. */
+  /* Collect file list, if specified. */
   if (file_list)
     {
-      status = TRUE;
       char filename[MAX_PATH + 2];
       FILE *file = file_list_fopen (file_list);
       if (!file)
-	exit (2);
+	return 2;
 
+      status = TRUE;
       while (file_list_fgets (filename, MAX_PATH + 2, file))
 	{
-	  status = image_info_flag ? collect_image_info (filename)
-				    : rebase (filename, &new_image_base);
+	  status = collect_image_info (filename);
 	  if (!status)
 	    break;
 	}
 
       file_list_fclose (file);
       if (!status)
-	exit (2);
+	return 2;
     }
 
-  /* Rebase command line arguments. */
+  /* Collect command line arguments. */
   for (i = args_index; i < argc; i++)
     {
       const char *filename = argv[i];
-      status = image_info_flag ? collect_image_info (filename)
-				 : rebase (filename, &new_image_base);
+      status = collect_image_info (filename);
       if (!status)
-	exit (2);
+	return 2;
     }
 
+  /* Nothing to do? */
+  if (img_info_size == 0)
+    return 0;
+
+  /* Check what we have to do and do it. */
   if (image_info_flag)
-    print_image_info ();
-
-  exit (0);
-}
-
-BOOL
-collect_image_info (const char *pathname)
-{
-  /* Skip if file does not exist to prevent ReBaseImage() from using it's
-     stupid search algorithm (e.g, PATH, etc.). */
-  if (access (pathname, F_OK) == -1)
     {
-      fprintf (stderr, "%s: skipped because nonexistent\n", pathname);
-      return TRUE;
+      /* Print. */
+      print_image_info ();
     }
-
-  if (img_info_size <= img_info_max_size)
+  else if (!image_storage_flag)
     {
-      img_info_max_size += 100;
-      img_info_list = (img_info_t *) realloc (img_info_list,
-					      img_info_max_size
-					      * sizeof (img_info_t));
-      if (!img_info_list)
+      /* Rebase. */
+      ULONG64 new_image_base = image_base;
+      for (i = 0; i < img_info_size; ++i)
 	{
-	  fprintf (stderr, "Out of memory.\n");
-	  exit (2);
+	  status = rebase (img_info_list[i].name, &new_image_base, down_flag);
+	  if (!status)
+	    return 2;
 	}
     }
+  else
+    {
+      /* Rebase with database support. */
+      merge_image_info ();
+      status = TRUE;
+      for (i = 0; i < img_info_size; ++i)
+	if (img_info_list[i].flag.needs_rebasing)
+	  {
+	    ULONG64 new_image_base = img_info_list[i].base;
+	    status = rebase (img_info_list[i].name, &new_image_base, FALSE);
+	    if (status)
+	      img_info_list[i].flag.needs_rebasing = 0;
+	  }
+      if (save_image_info () < 0)
+	return 2;
+    }
 
-  if (GetImageInfos64 (pathname, NULL,
-		       &img_info_list[img_info_size].base,
-		       &img_info_list[img_info_size].size))
-    img_info_list[img_info_size++].name = strdup (pathname);
-  return TRUE;
+  return 0;
 }
 
 int
@@ -177,46 +265,647 @@ img_info_cmp (const void *a, const void *b)
   return strcmp (((img_info_t *) a)->name, ((img_info_t *) b)->name);
 }
 
-void
-print_image_info ()
+int
+img_info_name_cmp (const void *a, const void *b)
 {
-  unsigned int i;
+  return strcmp (((img_info_t *) a)->name, ((img_info_t *) b)->name);
+}
 
-  qsort (img_info_list, img_info_size, sizeof (img_info_t), img_info_cmp);
+#ifndef __CYGWIN__
+int
+mkstemp (char *name)
+{
+  return open (mktemp (name), O_CREAT | O_TRUNC | O_EXCL, 0600);
+}
+#endif
+
+int
+save_image_info ()
+{
+  int i, fd;
+  int ret = 0;
+  img_info_hdr_t hdr;
+
+  /* Remove all DLLs which couldn't be rebased from the list before storing
+     it in the database file. */
   for (i = 0; i < img_info_size; ++i)
-    printf ("%-47s base 0x%08" PRIx64 " size 0x%08lx\n",
-	    img_info_list[i].name,
-	    img_info_list[i].base,
-	    img_info_list[i].size);
+    if (img_info_list[i].flag.needs_rebasing)
+      img_info_list[i--] = img_info_list[--img_info_size];
+  /* Create a temporary file to write to. */
+  fd = mkstemp (tmp_file);
+  if (fd < 0)
+    {
+      fprintf (stderr, "%s: failed to create temporary rebase database: %s\n",
+	       progname, strerror (errno));
+      return -1;
+    }
+  qsort (img_info_list, img_info_size, sizeof (img_info_t), img_info_name_cmp);
+  /* First write the number of entries. */
+  memcpy (hdr.magic, IMG_INFO_MAGIC, 4);
+  hdr.machine = machine;
+  hdr.version = IMG_INFO_VERSION;
+  hdr.base = image_base;
+  hdr.offset = offset;
+  hdr.down_flag = down_flag;
+  hdr.count = img_info_size;
+  if (write (fd, &hdr, sizeof hdr) < 0)
+    {
+      fprintf (stderr, "%s: failed to write rebase database: %s\n",
+	       progname, strerror (errno));
+      ret = -1;
+    }
+  /* Write the list. */
+  else if (write (fd, img_info_list, img_info_size * sizeof (img_info_t)) < 0)
+    {
+      fprintf (stderr, "%s: failed to write rebase database: %s\n",
+	       progname, strerror (errno));
+      ret = -1;
+    }
+  else
+    {
+      int i;
+
+      /* Write all strings. */
+      for (i = 0; i < img_info_size; ++i)
+	if (write (fd, img_info_list[i].name,
+		   strlen (img_info_list[i].name) + 1) < 0)
+	  {
+	    fprintf (stderr, "%s: failed to write rebase database: %s\n",
+		     progname, strerror (errno));
+	    ret = -1;
+	    break;
+	  }
+    }
+#ifdef __CYGWIN__
+  fchmod (fd, 0660);
+#else
+  chmod (tmp_file, 0660);
+#endif
+  close (fd);
+  if (ret < 0)
+    unlink (tmp_file);
+  else
+    {
+      if (unlink (db_file) < 0 && errno != ENOENT)
+	{
+	  fprintf (stderr,
+		   "%s: failed to remove old rebase database file \"%s\":\n"
+		   "%s\n"
+		   "The new rebase database is stored in \"%s\".\n"
+		   "Manually remove \"%s\" and rename \"%s\" to \"%s\",\n"
+		   "otherwise the new rebase database will be unusable.\n",
+		   progname, db_file,
+		   strerror (errno),
+		   tmp_file,
+		   db_file, tmp_file, db_file);
+	  ret = -1;
+	}
+      else if (rename (tmp_file, db_file) < 0)
+	{
+	  fprintf (stderr,
+		   "%s: failed to rename \"%s\" to \"%s\":\n"
+		   "%s\n"
+		   "Manually rename \"%s\" to \"%s\",\n"
+		   "otherwise the new rebase database will be unusable.\n",
+		   progname, tmp_file, db_file,
+		   strerror (errno),
+		   tmp_file, db_file);
+	  ret = -1;
+	}
+    }
+  return ret;
+}
+
+int
+load_image_info ()
+{
+  int fd;
+  int ret = 0;
+  int i;
+  img_info_hdr_t hdr;
+
+  fd = open (db_file, O_RDONLY);
+  if (fd < 0)
+    {
+      /* It's no error if the file doesn't exist.  However, in this case
+	 the -b option is mandatory. */
+      if (errno == ENOENT && image_base)
+      	return 0;
+      fprintf (stderr, "%s: failed to open rebase database \"%s\":\n%s\n",
+	       progname, db_file, strerror (errno));
+      return -1;
+    }
+  /* First read the header. */
+  if (read (fd, &hdr, sizeof hdr) < 0)
+    {
+      fprintf (stderr, "%s: failed to read rebase database \"%s\":\n%s\n",
+	       progname, db_file, strerror (errno));
+      close (fd);
+      return -1;
+    }
+  /* Check the header. */
+  if (memcmp (hdr.magic, IMG_INFO_MAGIC, 4) != 0)
+    {
+      fprintf (stderr, "%s: \"%s\" is not a valid rebase database.\n",
+	       progname, db_file);
+      close (fd);
+      return -1;
+    }
+  if (hdr.machine != machine)
+    {
+      if (hdr.machine == IMAGE_FILE_MACHINE_I386)
+	fprintf (stderr,
+"%s: \"%s\" is a database file for 32 bit DLLs but\n"
+"I'm started to handle 64 bit DLLs.  If you want to handle 32 bit DLLs,\n"
+"use the -4 option.\n", progname, db_file);
+      else if (hdr.machine == IMAGE_FILE_MACHINE_AMD64)
+	fprintf (stderr,
+"%s: \"%s\" is a database file for 64 bit DLLs but\n"
+"I'm started to handle 32 bit DLLs.  If you want to handle 64 bit DLLs,\n"
+"use the -8 option.\n", progname, db_file);
+      else
+	fprintf (stderr, "%s: \"%s\" is a database file for a machine type\n"
+			 "I don't know about.", progname, db_file);
+      close (fd);
+      return -1;
+    }
+  if (hdr.version != IMG_INFO_VERSION)
+    {
+      fprintf (stderr, "%s: \"%s\" is a version %u rebase database.\n"
+		       "I can only handle versions up to %lu.\n",
+	       progname, db_file, hdr.version, IMG_INFO_VERSION);
+      close (fd);
+      return -1;
+    }
+  /* If no new image base has been specified, use the one from the header. */
+  if (image_base == 0)
+    {
+      image_base = hdr.base;
+      down_flag = hdr.down_flag;
+    }
+  if (offset == 0)
+    offset = hdr.offset;
+  /* Don't enforce rebasing if address and offset are unchanged or taken from
+     the file anyway. */
+  if (image_base == hdr.base && offset == hdr.offset)
+    force_rebase_flag = FALSE;
+  img_info_size = hdr.count;
+  /* Allocate memory for the image list. */
+  if (ret == 0)
+    {
+      img_info_max_size = roundup (img_info_size, 100);
+      img_info_list = (img_info_t *) calloc (img_info_max_size,
+					     sizeof (img_info_t));
+      if (!img_info_list)
+	{
+	  fprintf (stderr, "%s: Out of memory.\n", progname);
+	  ret = -1;
+	}
+    }
+  /* Now read the list. */
+  if (ret == 0
+      && read (fd, img_info_list, img_info_size * sizeof (img_info_t)) < 0)
+    {
+      fprintf (stderr, "%s: failed to read rebase database \"%s\":\n%s\n",
+	       progname, db_file, strerror (errno));
+      ret = -1;
+    }
+  /* Make sure all pointers are NULL. */
+  if (ret == 0)
+    for (i = 0; i < img_info_size; ++i)
+      img_info_list[i].name = NULL;
+  /* Eventually read the strings. */
+  if (ret == 0)
+    {
+      for (i = 0; i < img_info_size; ++i)
+	{
+	  img_info_list[i].name = (char *)
+				  malloc (img_info_list[i].name_size);
+	  if (!img_info_list[i].name)
+	    {
+	      fprintf (stderr, "%s: Out of memory.\n", progname);
+	      ret = -1;
+	      break;
+	    }
+	  if (read (fd, img_info_list[i].name,
+		    img_info_list[i].name_size) < 0)
+	    {
+	      fprintf (stderr, "%s: failed to read rebase database \"%s\": "
+		       "%s\n", progname, db_file, strerror (errno));
+	      ret = -1;
+	      break;
+	    }
+	}
+    }
+  close (fd);
+  /* On failure, free all allocated memory and set list pointer to NULL. */
+  if (ret < 0)
+    {
+      for (i = 0; i < img_info_size && img_info_list[i].name; ++i)
+	free (img_info_list[i].name);
+      free (img_info_list);
+      img_info_list = NULL;
+      img_info_size = 0;
+      img_info_max_size = 0;
+    }
+  return ret;
+}
+
+int
+merge_image_info ()
+{
+  int i, end;
+  img_info_t *match;
+  ULONG64 floating_image_base;
+
+  /* Sort new files from command line by name. */
+  qsort (img_info_list + img_info_rebase_start,
+	 img_info_size - img_info_rebase_start, sizeof (img_info_t),
+	 img_info_name_cmp);
+  /* Iterate through new files and eliminate duplicates. */
+  for (i = img_info_rebase_start; i + 1 < img_info_size; ++i)
+    if ((img_info_list[i].name_size == img_info_list[i + 1].name_size
+	 && !strcmp (img_info_list[i].name, img_info_list[i + 1].name))
+#ifdef __CYGWIN__
+	|| !strcmp (img_info_list[i].name, "/usr/bin/cygwin1.dll")
+#endif
+       )
+      {
+	free (img_info_list[i].name);
+	memmove (img_info_list + i, img_info_list + i + 1, 
+		 (img_info_size - i - 1) * sizeof (img_info_t));
+	--img_info_size;
+	--i;
+      }
+  /* Iterate through new files and see if they are already available in
+     existing database. */
+  if (img_info_rebase_start)
+    {
+      for (i = img_info_rebase_start; i < img_info_size; ++i)
+	{
+	  match = bsearch (&img_info_list[i], img_info_list,
+			   img_info_rebase_start, sizeof (img_info_t),
+			   img_info_name_cmp);
+	  if (match)
+	    {
+	      /* We found a match.  Now test if the "new" file is actually
+		 the old file, or if it at least fits into the memory slot
+		 of the old file.  If so, screw the new file into the old slot.
+		 Otherwise set base to 0 to indicate that this DLL needs a new
+		 base address. */
+	      if (match->base != img_info_list[i].base
+		  || match->slot_size < img_info_list[i].slot_size)
+		{
+		  /* Reuse the old address if possible. */
+		  if (match->slot_size < img_info_list[i].slot_size)
+		    match->base = 0;
+		  match->flag.needs_rebasing = 1;
+		}
+	      /* Unconditionally overwrite old with new size. */
+	      match->size = img_info_list[i].size;
+	      match->slot_size = img_info_list[i].slot_size;
+	      /* Remove new entry from array. */
+	      free (img_info_list[i].name);
+	      img_info_list[i--] = img_info_list[--img_info_size];
+	    }
+	  else
+	    /* Not in database yet.  Set base to 0 to choose a new one. */
+	    img_info_list[i].base = 0;
+	}
+      /* After eliminating the duplicates, check if the user requested
+	 a new base address on the command line.  If so, overwrite all
+	 base addresses with 0 and set img_info_rebase_start to 0, to
+	 skip any further test. */
+      if (force_rebase_flag)
+	img_info_rebase_start = 0;
+    }
+  if (!img_info_rebase_start)
+    {
+      /* No database yet or enforcing a new base address.  Set base of all
+	 DLLs to 0. */
+      for (i = 0; i < img_info_size; ++i)
+	img_info_list[i].base = 0;
+    }
+
+  /* Now sort the old part of the list by base address. */
+  if (img_info_rebase_start)
+    qsort (img_info_list, img_info_rebase_start, sizeof (img_info_t),
+	   img_info_cmp);
+  /* Perform several tests on the information fetched from the database
+     to match with reality. */
+  for (i = 0; i < img_info_rebase_start; ++i)
+    {
+      ULONG64 cur_base;
+      ULONG cur_size, slot_size;
+
+      /* Files with the needs_rebasing flag set have been checked already. */
+      if (img_info_list[i].flag.needs_rebasing)
+	continue;
+      /* Check if the files in the old list still exist.  Drop non-existant
+	 or unaccessible files. */
+      if (access (img_info_list[i].name, F_OK) == -1
+	  || !GetImageInfos64 (img_info_list[i].name, NULL,
+			       &cur_base, &cur_size))
+      	{
+	  free (img_info_list[i].name);
+	  memmove (img_info_list + i, img_info_list + i + 1,
+		   (img_info_size - i - 1) * sizeof (img_info_t));
+	  --img_info_rebase_start;
+	  --img_info_size;
+	  continue;
+	}
+      slot_size = roundup2 (cur_size, ALLOCATION_SLOT);
+      /* If the file has been reinstalled, try to rebase to the same address
+	 in the first place. */
+      if (cur_base != img_info_list[i].base)
+	{
+	  img_info_list[i].flag.needs_rebasing = 1;
+	  /* Set cur_base to the old base to simplify subsequent tests. */
+	  cur_base = img_info_list[i].base;
+	}
+      /* However, if the DLL got bigger and doesn't fit into its slot
+	 anymore, rebase this DLL from scratch. */
+      if (i + 1 < img_info_rebase_start
+	  && cur_base + slot_size + offset >= img_info_list[i + 1].base)
+	img_info_list[i].base = 0;
+      /* Does the file match the base address requirements?  If not,
+	 rebase from scratch. */
+      else if ((down_flag && cur_base + slot_size + offset >= image_base)
+	       || (!down_flag && cur_base < image_base))
+	img_info_list[i].base = 0;
+      /* Unconditionally overwrite old with new size. */
+      img_info_list[i].size = cur_size;
+      img_info_list[i].slot_size = slot_size;
+      /* Make sure all DLLs with base address 0 have the needs_rebasing
+	 flag set. */
+      if (img_info_list[i].base == 0)
+	img_info_list[i].flag.needs_rebasing = 1;
+    }
+  /* The remainder of the function expects img_info_size to be > 0. */
+  if (img_info_size == 0)
+    return 0;
+
+  /* Now sort entire list by base address.  The files with address 0 will
+     be first. */
+  if (!force_rebase_flag)
+    qsort (img_info_list, img_info_size, sizeof (img_info_t), img_info_cmp);
+  /* Try to fit all DLLs with base address 0 into the given list. */
+  /* FIXME: This loop only implements the top-down case.  Implement a
+     bottom-up case, too, at one point. */
+  floating_image_base = image_base;
+  end = img_info_size - 1;
+  while (img_info_list[0].base == 0)
+    {
+      ULONG64 new_base;
+
+      /* Skip trailing entries as long as there is no hole. */
+       while (img_info_list[end].base + img_info_list[end].slot_size + offset
+	     >= floating_image_base)
+	{
+	  floating_image_base = img_info_list[end].base;
+	  --end;
+	}
+      /* Test if one of the DLLs with address 0 fits into the hole. */
+      for (i = 0, new_base = 0; img_info_list[i].base == 0; ++i, new_base = 0)
+	{
+	  new_base = floating_image_base - img_info_list[i].slot_size - offset;
+	  if (new_base >= img_info_list[end].base
+			  + img_info_list[end].slot_size
+#ifdef __CYGWIN__
+	      /* Don't overlap the Cygwin DLL. */
+	      && (new_base >= cygwin_dll_image_base + cygwin_dll_image_size
+		  || new_base + img_info_list[i].slot_size
+		     <= cygwin_dll_image_base)
+#endif
+	     )
+	    break;
+	}
+      /* Found a match.  Mount into list. */
+      if (new_base)
+	{
+	  img_info_t tmp = img_info_list[i];
+	  tmp.base = new_base;
+	  memmove (img_info_list + i, img_info_list + i + 1,
+		   (end - i) * sizeof (img_info_t));
+	  img_info_list[end] = tmp;
+	  continue;
+	}
+      /* Nothing matches.  Set floating_image_base to the start of the
+	 uppermost DLL at this point and try again. */
+#ifdef __CYGWIN__
+      if (floating_image_base >= cygwin_dll_image_base + cygwin_dll_image_size
+	  && img_info_list[end].base < cygwin_dll_image_base)
+	floating_image_base = cygwin_dll_image_base;
+      else
+#endif
+	{
+	  floating_image_base = img_info_list[end].base;
+	  --end;
+	}
+    }
+
+  return 0;
 }
 
 BOOL
-rebase (const char *pathname, ULONG64 *new_image_base)
+collect_image_info (const char *pathname)
 {
-  ULONG64 old_image_base, prev_new_image_base;
-  ULONG old_image_size, new_image_size;
-  BOOL status, status2;
+  BOOL ret;
+  WORD dll_machine;
 
   /* Skip if file does not exist to prevent ReBaseImage() from using it's
      stupid search algorithm (e.g, PATH, etc.). */
   if (access (pathname, F_OK) == -1)
     {
-      fprintf (stderr, "%s: skipped because nonexistent\n", pathname);
+      if (!quiet)
+	fprintf (stderr, "%s: skipped because nonexistent.\n", pathname);
       return TRUE;
     }
+
+  /* Skip if not rebaseable, but only if we're collecting for rebasing,
+     not if we're collecting for printing only. */
+  if (!image_info_flag && !is_rebaseable (pathname))
+    {
+      if (!quiet)
+	fprintf (stderr, "%s: skipped because not rebaseable\n", pathname);
+      return TRUE;
+    }
+
+  if (img_info_size >= img_info_max_size)
+    {
+      img_info_max_size += 100;
+      img_info_list = (img_info_t *) realloc (img_info_list,
+					      img_info_max_size
+					      * sizeof (img_info_t));
+      if (!img_info_list)
+	{
+	  fprintf (stderr, "%s: Out of memory.\n", progname);
+	  return FALSE;
+	}
+    }
+
+  ret = GetImageInfos64 (pathname, &dll_machine,
+			 &img_info_list[img_info_size].base,
+			 &img_info_list[img_info_size].size);
+  if (!ret)
+    {
+      if (!quiet)
+	fprintf (stderr, "%s: skipped because file info unreadable.\n",
+		 pathname);
+      return TRUE;
+    }
+  /* We only support IMAGE_FILE_MACHINE_I386 and IMAGE_FILE_MACHINE_AMD64
+     so far. */
+  if (machine != IMAGE_FILE_MACHINE_I386
+      && machine != IMAGE_FILE_MACHINE_AMD64)
+    {
+      if (quiet)
+	fprintf (stderr, "%s: is an executable for a machine type\n"
+			 "I don't know about.", pathname);
+      return TRUE;
+    }
+  /* We either operate on 32 bit or 64 bit files.  Never mix them. */
+  if (dll_machine != machine)
+    {
+      if (!quiet)
+	fprintf (stderr, "%s: skipped because wrong machine type.\n",
+		 pathname);
+      return TRUE;
+    }
+  img_info_list[img_info_size].slot_size
+    = roundup2 (img_info_list[img_info_size].size, ALLOCATION_SLOT);
+  img_info_list[img_info_size].flag.needs_rebasing = 1;
+  /* This back and forth from POSIX to Win32 is a way to get a full path
+     more thoroughly.  For instance, the difference between /bin and
+     /usr/bin will be eliminated. */
+#if defined (__MSYS__)
+  {
+    char w32_path[MAX_PATH];
+    char full_path[MAX_PATH];
+    cygwin_conv_to_full_win32_path (pathname, w32_path);
+    cygwin_conv_to_full_posix_path (w32_path, full_path);
+    img_info_list[img_info_size].name = strdup (full_path);
+    img_info_list[img_info_size].name_size = strlen (full_path) + 1;
+  }
+#elif defined (__CYGWIN__)
+  {
+    PWSTR w32_path = cygwin_create_path (CCP_POSIX_TO_WIN_W, pathname);
+    if (!w32_path)
+      {
+	fprintf (stderr, "%s: Out of memory.\n", progname);
+	return FALSE;
+      }
+    img_info_list[img_info_size].name
+      = cygwin_create_path (CCP_WIN_W_TO_POSIX, w32_path);
+    if (!img_info_list[img_info_size].name)
+      {
+	fprintf (stderr, "%s: Out of memory.\n", progname);
+	return FALSE;
+      }
+    free (w32_path);
+    img_info_list[img_info_size].name_size
+      = strlen (img_info_list[img_info_size].name) + 1;
+  }
+#else
+  {
+    char full_path[MAX_PATH];
+    GetFullPathName (pathname, MAX_PATH, full_path, NULL);
+    img_info_list[img_info_size].name = strdup (full_path);
+    img_info_list[img_info_size].name_size = strlen (full_path) + 1;
+  }
+#endif
+  ++img_info_size;
+  return TRUE;
+}
+
+void
+print_image_info ()
+{
+  unsigned int i;
+
+  /* Sort list by name. */
+  qsort (img_info_list, img_info_size, sizeof (img_info_t), img_info_name_cmp);
+  /* Iterate through list and eliminate duplicates. */
+  for (i = 0; i + 1 < img_info_size; ++i)
+    if (img_info_list[i].name_size == img_info_list[i + 1].name_size
+	&& !strcmp (img_info_list[i].name, img_info_list[i + 1].name))
+      {
+	/* Remove duplicate, but prefer one from the command line over one
+	   from the database, because the one from the command line reflects
+	   the reality, while the database is wishful thinking. */
+	if (img_info_list[i].flag.needs_rebasing == 0)
+	  {
+	    free (img_info_list[i].name);
+	    memmove (img_info_list + i, img_info_list + i + 1, 
+		     (img_info_size - i - 1) * sizeof (img_info_t));
+	  }
+	else
+	  {
+	    free (img_info_list[i + 1].name);
+	    if (i + 2 < img_info_size)
+	      memmove (img_info_list + i + 1, img_info_list + i + 2, 
+		       (img_info_size - i - 2) * sizeof (img_info_t));
+	  }
+	--img_info_size;
+	--i;
+      }
+  /* For entries loaded from database, collect image info to reflect reality.
+     Also, collect_image_info sets needs_rebasing to 1, so reset here. */
+  for (i = 0; i < img_info_size; ++i)
+    {
+      if (img_info_list[i].flag.needs_rebasing == 0)
+	{
+	  ULONG64 base;
+	  ULONG size;
+
+	  if (GetImageInfos64 (img_info_list[i].name, NULL, &base, &size))
+	    {
+	      img_info_list[i].base = base;
+	      img_info_list[i].size = size;
+	      img_info_list[i].slot_size
+		= roundup2 (img_info_list[i].size, ALLOCATION_SLOT);
+	    }
+	}
+      else
+	img_info_list[i].flag.needs_rebasing = 0;
+    }
+  /* Now sort by address. */
+  qsort (img_info_list, img_info_size, sizeof (img_info_t), img_info_cmp);
+  for (i = 0; i < img_info_size; ++i)
+    {
+      int tst;
+      ULONG64 end = img_info_list[i].base + img_info_list[i].slot_size;
+
+      /* Check for overlap and mark both DLLs. */
+      for (tst = i + 1;
+	   tst < img_info_size && img_info_list[tst].base < end;
+	   ++tst)
+	{
+	  img_info_list[i].flag.needs_rebasing = 1;
+	  img_info_list[tst].flag.needs_rebasing = 1;
+	}
+      printf ("%-*s base 0x%0*" PRIx64 " size 0x%08lx %c\n",
+	      machine == IMAGE_FILE_MACHINE_I386 ? 45 : 41,
+	      img_info_list[i].name,
+	      machine == IMAGE_FILE_MACHINE_I386 ? 8 : 12,
+	      img_info_list[i].base,
+	      img_info_list[i].size,
+	      img_info_list[i].flag.needs_rebasing ? '*' : ' ');
+    }
+}
+
+BOOL
+rebase (const char *pathname, ULONG64 *new_image_base, BOOL down_flag)
+{
+  ULONG64 old_image_base, prev_new_image_base;
+  ULONG old_image_size, new_image_size;
+  BOOL status, status2;
 
   /* Skip if not writable. */
   if (access (pathname, W_OK) == -1)
     {
-      fprintf (stderr, "%s: skipped because not writable\n", pathname);
-      return TRUE;
-    }
-
-  /* Skip if not rebaseable. */
-  if (!is_rebaseable (pathname))
-    {
-      if (verbose)
-	fprintf (stderr, "%s: skipped because not rebaseable\n", pathname);
+      if (!quiet)
+	fprintf (stderr, "%s: skipped because not writable\n", pathname);
       return TRUE;
     }
 
@@ -312,18 +1001,47 @@ retry:
   return TRUE;
 }
 
+static struct option long_options[] = {
+  {"32",	no_argument,	   NULL, '4'},
+  {"64",	no_argument,	   NULL, '8'},
+  {"base",	required_argument, NULL, 'b'},
+  {"down",	no_argument,	   NULL, 'd'},
+  {"help",	no_argument,	   NULL, 'h'},
+  {"usage",	no_argument,	   NULL, 'h'},
+  {"info",	no_argument,	   NULL, 'i'},
+  {"offset",	required_argument, NULL, 'o'},
+  {"quiet",	no_argument,	   NULL, 'q'},
+  {"database",	no_argument,	   NULL, 's'},
+  {"filelist",	required_argument, NULL, 'T'},
+  {"usage",	no_argument,	   NULL, 'h'},
+  {"verbose",	no_argument,	   NULL, 'v'},
+  {"version",	no_argument,	   NULL, 'V'},
+  {NULL,	no_argument,	   NULL,  0 }
+};
+
+static const char *short_options = "48b:dhio:qsT:vV";
+
 void
 parse_args (int argc, char *argv[])
 {
-  const char *anOptions = "b:dio:T:vV";
-  int anOption = 0;
+  int opt = 0;
 
-  while ((anOption = getopt (argc, argv, anOptions)) != -1)
+  while ((opt = getopt_long (argc, argv, short_options, long_options, NULL))
+	 != -1)
     {
-      switch (anOption)
+      switch (opt)
 	{
+	case '4':
+	  machine = IMAGE_FILE_MACHINE_I386;
+	  db_file = IMG_INFO_FILE_I386;
+	  break;
+	case '8':
+	  machine = IMAGE_FILE_MACHINE_AMD64;
+	  db_file = IMG_INFO_FILE_AMD64;
+	  break;
 	case 'b':
 	  image_base = string_to_ulonglong (optarg);
+	  force_rebase_flag = TRUE;
 	  break;
 	case 'd':
 	  down_flag = TRUE;
@@ -333,12 +1051,25 @@ parse_args (int argc, char *argv[])
 	  break;
 	case 'o':
 	  offset = string_to_ulonglong (optarg);
+	  force_rebase_flag = TRUE;
+	  break;
+	case 'q':
+	  quiet = TRUE;
+	  break;
+	case 's':
+	  image_storage_flag = TRUE;
+	  /* FIXME: For now enforce top-down rebasing when using the database.*/
+	  down_flag = TRUE;
 	  break;
 	case 'T':
 	  file_list = optarg;
 	  break;
 	case 'v':
 	  verbose = TRUE;
+	  break;
+	case 'h':
+	  help ();
+	  exit (1);
 	  break;
 	case 'V':
 	  version ();
@@ -351,7 +1082,7 @@ parse_args (int argc, char *argv[])
 	}
     }
 
-  if ((image_base == 0 && !image_info_flag)
+  if ((image_base == 0 && !image_info_flag && !image_storage_flag)
       || (image_base && image_info_flag))
     {
       usage ();
@@ -373,9 +1104,56 @@ void
 usage ()
 {
   fprintf (stderr,
-	   "usage: rebase -b BaseAddress [-Vdv] [-o Offset] "
-	   "[-T FileList | -] Files...\n"
-	   "       rebase -i [-T FileList | -] Files...\n");
+"usage: %s [-b BaseAddress] [-o Offset] [-48dsvV] [-T FileList | -] Files...\n"
+"       %s -i [-48s] [-T FileList | -] Files...\n"
+"       %s --help or --usage for full help text\n",
+	   progname, progname, progname);
+}
+
+void
+help ()
+{
+  printf ("\
+Usage: %s [OPTIONS] [FILE]...\n\
+Rebase PE files, usually DLLs, to a specified address or address range.\n\
+\n\
+  -4, --32                Only rebase 32 bit DLLs."
+#ifndef __x86_64__
+                          "  This is the default."
+#endif
+"\n\
+  -8, --64                Only rebase 64 bit DLLs."
+#ifdef __x86_64__
+                          "  This is the default."
+#endif
+"\n\
+  -b, --base=BASEADDRESS  Specifies the base address at which to start rebasing.\n\
+  -s, --database          Utilize the rebase database to find unused memory\n\
+                          slots to rebase the files on the command line to.\n\
+                          (Implies -d).\n\
+                          If -b is given, too, the database gets recreated.\n\
+  -i, --info              Rather then rebasing, just print the current base\n\
+                          address and size of the files.  With -s, use the\n\
+                          database.  The files are ordered by base address.\n\
+                          A '*' at the end of the line is printed if a\n\
+                          collisions with an adjacent file is detected.\n\
+\n\
+  One of the options -b, -s or -i is mandatory.  If no rebase database exists\n\
+  yet, -b is required together with -s.\n\
+\n\
+  -d, --down              Treat the BaseAddress as upper ceiling and rebase\n\
+                          files top-down from there.  Without this option the\n\
+                          files are rebased from BaseAddress bottom-up.\n\
+                          With the -s option, this option is implicitly set.\n\
+  -o, --offset=OFFSET     Specify an additional offset between adjacent DLLs\n\
+                          when rebasing.  Default is no offset.\n\
+  -T, --filelist=FILE     Also rebase the files specified in FILE.  The format\n\
+                          of FILE is one DLL per line.\n\
+  -q, --quiet             Be quiet about non-critical issues.\n\
+  -v, --verbose           Print some debug output.\n\
+  -V, --version           Print version info and exit.\n\
+  -h, --help, --usage     This help.\n",
+	  progname);
 }
 
 BOOL

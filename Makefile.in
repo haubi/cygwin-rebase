@@ -56,7 +56,7 @@ FGREP = @FGREP@
 ASH = @ASH@
 
 DEFAULT_INCLUDES = -I. -I$(srcdir) -I$(srcdir)/imagehelper
-DEFS = @DEFS@ -DVERSION='"$(PACKAGE_VERSION)"' -DLIB_VERSION='"$(LIB_VERSION)"'
+DEFS = @DEFS@ -DVERSION='"$(PACKAGE_VERSION)"' -DLIB_VERSION='"$(LIB_VERSION)"' -DSYSCONFDIR='"$(sysconfdir)"'
 
 override CFLAGS+=-Wall -Werror
 override CXXFLAGS+=-Wall -Werror
@@ -109,6 +109,7 @@ getopt_long.$(O):: getopt_long.c getopt.h
 # bindir and friends in your shell scripts"
 edit = sed \
 	-e 's|@bindir[@]|$(bindir)|g' \
+	-e 's|@sysconfdir[@]|$(sysconfdir)|g' \
 	-e 's|@pkgdatadir[@]|$(pkgdatadir)|g' \
 	-e 's|@prefix[@]|$(prefix)|g' \
 	-e 's|@exec_prefix[@]|$(exec_prefix)|g' \

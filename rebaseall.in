@@ -22,7 +22,7 @@ tp2=${tp1:-.}
 PATH=$(cd $tp2 && pwd):@bindir@:/bin
 
 ProgramName=${0##*/}
-ProgramOptions='b:o:s:T:v'
+ProgramOptions='48b:o:s:T:v'
 DefaultBaseAddress=0x70000000
 DefaultOffset=@DEFAULT_OFFSET_VALUE@
 DefaultVerbose=
@@ -32,31 +32,43 @@ DefaultSuffixes='dll|so'
 # Define functions
 usage()
 {
-    echo "usage: $ProgramName [-b BaseAddress] [-o Offset] [-s DllSuffix] [-T FileList | -] [-v]"
+    echo "usage: ${ProgramName} [-b BaseAddress] [-o Offset] [-s DllSuffix] [-T FileList | -] [-4|-8] [-v]"
     exit 1
 }
 
 cleanup()
 {
-    rm -f "$TmpFile"
-    exit $ExitCode
+    rm -f "${TmpFile}"
+    exit ${ExitCode}
 }
 
 # Set traps
 trap cleanup 1 2 15
 
 # Set defaults
-BaseAddress=$DefaultBaseAddress
-Offset=$DefaultOffset
-Verbose=$DefaultVerbose
-FileList=$DefaultFileList
-Suffixes=$DefaultSuffixes
+BaseAddress=""
+Offset="${DefaultOffset}"
+Verbose="${DefaultVerbose}"
+FileList="${DefaultFileList}"
+Suffixes="${DefaultSuffixes}"
+db_file_i386="@sysconfdir@/rebase.db.i386"
+db_file_x86_64="@sysconfdir@/rebase.db.x86_64"
+case `uname -m` in
+    i[3456]86)
+	db_file="${db_file_i386}";
+	Mach="-4"
+	;;
+    x86_64)
+	Mach="-8"
+	db_file="${db_file_x86_64}"
+	;;
+esac
 
 # Verify only ash or dash processes are running
 grep -E -q -i -v '/d?ash(.exe)?$' /proc/[0-9]*/exename
-if [ $? -eq 0 -a -z "$RebaseDebug" ]
+if [ $? -eq 0 -a -z "${RebaseDebug}" ]
 then
-    echo "$ProgramName: only ash or dash processes are allowed during rebasing"
+    echo "${ProgramName}: only ash or dash processes are allowed during rebasing"
     echo "    Exit all Cygwin processes and stop all Cygwin services."
     echo "    Execute ash (or dash) from Start/Run... or a cmd or command window."
     echo "    Execute '/bin/rebaseall' from ash (or dash)."
@@ -64,23 +76,42 @@ then
 fi
 
 # Parse command line arguments
-while getopts $ProgramOptions Option "$@"
+while getopts "${ProgramOptions}" Option "$@"
 do
-    case $Option in
+    case "${Option}" in
+    4)
+	db_file="${db_file_i386}";
+	Mach="-4"
+	;;
+    8)
+	Mach="-8"
+	db_file="${db_file_x86_64}"
+	;;
     b)
-	BaseAddress=$OPTARG;;
+	BaseAddress="${OPTARG}";;
     o)
-	Offset=$OPTARG;;
+	Offset="${OPTARG}";;
     s)
-	Suffixes="$Suffixes|$OPTARG";;
+	Suffixes="${Suffixes}|${OPTARG}";;
     T)
-	FileList="$OPTARG";;
+	FileList="${OPTARG}";;
     v)
-	Verbose=-v;;
+	Verbose="-v";;
     \?)
 	usage;;
     esac
 done
+
+# Check if rebase database already exists.
+database_exists="no"
+[ -f "${db_file}" ] && database_exists="yes"
+
+# If BaseAddress has not been specified, and the rebase database doesn't exist
+# yet, set BaseAddress to default.
+if [ -z "${BaseAddress}" -a "${database_exists}" != "yes" ]
+then
+  BaseAddress=$DefaultBaseAddress
+fi
 
 # Set temp directory
 TmpDir="${TMP:-${TEMP:-/tmp}}"
@@ -112,16 +143,20 @@ find /etc/setup -name '*.lst.gz' | xargs gzip -d -c |
     grep -E "\.($Suffixes)\$" |
     sed -e '/cygwin1\.dll$/d' -e '/cyglsa.*\.dll$/d' \
 	-e '/sys-root\/mingw/d' \
-	-e 's/^/\//' -e '/d?ash\.exe$/d' -e '/rebase\.exe$/d' >"$TmpFile"
+	-e 's/^/\//' -e '/d?ash\.exe$/d' -e '/rebase\.exe$/d' >"${TmpFile}"
 
 # Append user supplied file list, if any
-if [ -n "$FileList" ]
+if [ -n "${FileList}" ]
 then
-    cat "$FileList" >>"$TmpFile"
+    cat "${FileList}" >>"${TmpFile}"
 fi
 
-# Rebase files
-rebase $Verbose -d -b $BaseAddress -o $Offset -T "$TmpFile"
+if [ -z "${BaseAddress}" ]
+then
+  ./rebase "${Verbose}" -s "${Mach}" -T "${TmpFile}"
+else
+  ./rebase "${Verbose}" -s "${Mach}" -b "${BaseAddress}" -o "${Offset}" -T "${TmpFile}"
+fi
 ExitCode=$?
 
 # Clean up
