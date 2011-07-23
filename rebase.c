@@ -1089,6 +1089,14 @@ parse_args (int argc, char *argv[])
       exit (1);
     }
 
+  if (machine == IMAGE_FILE_MACHINE_I386 && image_base > 0xffffffff)
+    {
+      fprintf (stderr,
+	       "%s: Base address 0x%" PRIx64 " too big for 32 bit machines.\n",
+	       progname, image_base);
+      exit (1);
+    }
+
   args_index = optind;
 }
 
@@ -1096,7 +1104,7 @@ unsigned long long
 string_to_ulonglong (const char *string)
 {
   unsigned long long number = 0;
-  number = strtoull (string, 0, 0);
+  number = strtoull (string, NULL, 0);
   return number;
 }
 

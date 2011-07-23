@@ -1,3 +1,9 @@
+2011-07-23  Corinna Vinschen  <corinna@vinschen.de>
+
+	* rebase.c (parse_args): Check that base address doesn't
+	exceed valid address space for 32 bit DLLs.
+	(string_to_ulonglong): Use NULL, rather then 0, for pointer argument.
+
 2011-07-21  Corinna Vinschen  <corinna@vinschen.de>
 
 	* Makefile.in (DEFS): Add define for sysconfdir.
