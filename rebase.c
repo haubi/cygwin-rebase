@@ -380,6 +380,7 @@ int
 load_image_info ()
 {
   int fd;
+  ssize_t read_ret;
   int ret = 0;
   int i;
   img_info_hdr_t hdr;
@@ -396,10 +397,14 @@ load_image_info ()
       return -1;
     }
   /* First read the header. */
-  if (read (fd, &hdr, sizeof hdr) < 0)
+  if ((read_ret = read (fd, &hdr, sizeof hdr)) != sizeof hdr)
     {
-      fprintf (stderr, "%s: failed to read rebase database \"%s\":\n%s\n",
-	       progname, db_file, strerror (errno));
+      if (read_ret < 0)
+	fprintf (stderr, "%s: failed to read rebase database \"%s\":\n%s\n",
+		 progname, db_file, strerror (errno));
+      else
+	fprintf (stderr, "%s: premature end of rebase database \"%s\".\n",
+		 progname, db_file);
       close (fd);
       return -1;
     }
@@ -464,10 +469,16 @@ load_image_info ()
     }
   /* Now read the list. */
   if (ret == 0
-      && read (fd, img_info_list, img_info_size * sizeof (img_info_t)) < 0)
+      && (read_ret = read (fd, img_info_list,
+			   img_info_size * sizeof (img_info_t)))
+	 != img_info_size * sizeof (img_info_t))
     {
-      fprintf (stderr, "%s: failed to read rebase database \"%s\":\n%s\n",
-	       progname, db_file, strerror (errno));
+      if (read_ret < 0)
+	fprintf (stderr, "%s: failed to read rebase database \"%s\":\n%s\n",
+		 progname, db_file, strerror (errno));
+      else
+	fprintf (stderr, "%s: premature end of rebase database \"%s\".\n",
+		 progname, db_file);
       ret = -1;
     }
   /* Make sure all pointers are NULL. */
@@ -487,11 +498,17 @@ load_image_info ()
 	      ret = -1;
 	      break;
 	    }
-	  if (read (fd, img_info_list[i].name,
-		    img_info_list[i].name_size) < 0)
+	  if ((read_ret = read (fd, img_info_list[i].name,
+				img_info_list[i].name_size))
+	      != img_info_list[i].name_size)
 	    {
-	      fprintf (stderr, "%s: failed to read rebase database \"%s\": "
-		       "%s\n", progname, db_file, strerror (errno));
+	      if (read_ret < 0)
+		fprintf (stderr, "%s: failed to read rebase database \"%s\": "
+			 "%s\n", progname, db_file, strerror (errno));
+	      else
+		fprintf (stderr,
+			 "%s: premature end of rebase database \"%s\".\n",
+			 progname, db_file);
 	      ret = -1;
 	      break;
 	    }
