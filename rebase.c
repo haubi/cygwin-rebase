@@ -839,6 +839,8 @@ void
 print_image_info ()
 {
   unsigned int i;
+  /* Default name field width to longest available for 80 char display. */
+  int name_width = (machine == IMAGE_FILE_MACHINE_I386) ? 45 : 41;
 
   /* Sort list by name. */
   qsort (img_info_list, img_info_size, sizeof (img_info_t), img_info_name_cmp);
@@ -867,7 +869,8 @@ print_image_info ()
 	--i;
       }
   /* For entries loaded from database, collect image info to reflect reality.
-     Also, collect_image_info sets needs_rebasing to 1, so reset here. */
+     Also, collect_image_info sets needs_rebasing to 1, so reset here.
+     Also, fetch the longest name length for formatting purposes. */
   for (i = 0; i < img_info_size; ++i)
     {
       if (img_info_list[i].flag.needs_rebasing == 0)
@@ -885,6 +888,7 @@ print_image_info ()
 	}
       else
 	img_info_list[i].flag.needs_rebasing = 0;
+      name_width = max (name_width, img_info_list[i].name_size - 1);
     }
   /* Now sort by address. */
   qsort (img_info_list, img_info_size, sizeof (img_info_t), img_info_cmp);
@@ -902,7 +906,7 @@ print_image_info ()
 	  img_info_list[tst].flag.needs_rebasing = 1;
 	}
       printf ("%-*s base 0x%0*" PRIx64 " size 0x%08lx %c\n",
-	      machine == IMAGE_FILE_MACHINE_I386 ? 45 : 41,
+	      name_width,
 	      img_info_list[i].name,
 	      machine == IMAGE_FILE_MACHINE_I386 ? 8 : 12,
 	      img_info_list[i].base,
