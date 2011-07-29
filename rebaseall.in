@@ -3,13 +3,20 @@
 #
 # Copyright (c) 2003, 2005, 2006, 2008, 2011 Jason Tishler
 #
-# This program is free software; you can redistribute it and/or modify
+# This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; either version 2 of the License, or
+# the Free Software Foundation, either version 2 of the License, or
 # (at your option) any later version.
 #
-# A copy of the GNU General Public License can be found at
-# http://www.gnu.org/
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+# See the COPYING file for full license information.
 #
 # Written by Jason Tishler <jason@tishler.net>
 #
@@ -64,9 +71,49 @@ case `uname -m` in
 	;;
 esac
 
+# Determine platform
+Platform=`uname -s`
+case $Platform in
+ *MINGW*  | *mingw*  ) Platform=mingw  ;;
+ *CYGWIN* | *cygwin* ) Platform=cygwin ;;
+ *MSYS*   | *msys*   ) Platform=msys   ;;
+ * )
+    echo "Unsupported platform: $Platform" 1>&2
+    exit 1
+    ;;
+esac
+
 # Verify only ash or dash processes are running
-grep -E -q -i -v '/d?ash(.exe)?$' /proc/[0-9]*/exename
-if [ $? -eq 0 -a -z "${RebaseDebug}" ]
+ProcessResult=0
+case $Platform in
+  mingw|msys )
+    /bin/ps -s | /bin/gawk '\
+      # Count number of running ash or dash. \
+      /\/bin\/(d)?ash(\.exe)?$/{ ash_cnt++; } \
+      # Count number of ps and gawk. \
+      /\/bin\/ps(\.exe)?$/{ cnt++; } \
+      /\/bin\/gawk(\.exe)?$/{ cnt++; } \
+      END{ \
+        # Uncomment for testing: \
+        # printf "TOTAL: %d CNT: %d ASH_CNT: %d\n", NR, cnt, ash_cnt; \
+        # Only one of ps and gawk each may run. \
+        if (cnt > 2) \
+          exit 0; \
+        # The total number of allowed processes is one less than the \
+        # number of input lines.  The extra line is the ps header output. \
+        if (NR - cnt - ash_cnt > 1) \
+          exit 0; \
+        # All is well. \
+        exit 1; \
+      }'
+    ProcessResult=$?
+    ;;
+  cygwin )
+    grep -E -q -i -v '/d?ash(.exe)?$' /proc/[0-9]*/exename
+    ProcessResult=$?
+    ;;
+esac
+if [ $ProcessResult -eq 0 -a -z "${RebaseDebug}" ]
 then
     echo "${ProgramName}: only ash or dash processes are allowed during rebasing"
     echo "    Exit all Cygwin processes and stop all Cygwin services."
@@ -139,11 +186,25 @@ fi
 TmpFile="$TmpDir/rebase.lst"
 
 # Create rebase list
-find /etc/setup -name '*.lst.gz' | xargs gzip -d -c |
-    grep -E "\.($Suffixes)\$" |
-    sed -e '/cygwin1\.dll$/d' -e '/cyglsa.*\.dll$/d' \
-	-e '/sys-root\/mingw/d' \
-	-e 's/^/\//' -e '/d?ash\.exe$/d' -e '/rebase\.exe$/d' >"${TmpFile}"
+case $Platform in
+  cygwin)
+    find /etc/setup -name '*.lst.gz' | xargs gzip -d -c |
+      grep -E "\.($Suffixes)\$" |
+      sed -e '/cygwin1\.dll$/d' -e '/cyglsa.*\.dll$/d' \
+          -e '/sys-root\/mingw/d' -e 's/^/\//' \
+          -e '/d?ash\.exe$/d' -e '/rebase\.exe$/d' >"${TmpFile}"
+    ;;
+  mingw|msys)
+    for f in /bin /lib
+    do
+      find $f -type f |
+        grep -E "\.($Suffixes)\$" |
+	sed -e '/msys-1\.0.*\.dll$/d' -e '/cygwin1\.dll$/d' \
+	    -e '/cyglsa.*\.dll$/d' -e '/d?ash\.exe$/d' \
+	    -e '/rebase\.exe$/d' >>"$TmpFile"
+    done
+    ;;
+esac
 
 # Append user supplied file list, if any
 if [ -n "${FileList}" ]

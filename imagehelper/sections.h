@@ -23,6 +23,21 @@
 
 #include <windows.h>
 
+#if !defined(__CYGWIN__) || defined(__MSYS__)
+/* MinGW|MSYS: mingw only defines uintptr_t for        */
+/* MSVC 2005 or better, and MSYS doesn't have stdint.h */
+# ifndef _UINTPTR_T_DEFINED
+#  define _UINTPTR_T_DEFINED
+#  ifdef _WIN64
+     typedef unsigned __int64 uintptr_t;
+#  else
+     typedef unsigned int uintptr_t;
+#  endif
+# endif
+#else
+# include <stdint.h>
+#endif
+
 typedef unsigned int uint;
 typedef unsigned short ushort;
 

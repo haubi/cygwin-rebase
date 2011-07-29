@@ -58,9 +58,10 @@ ASH = @ASH@
 DEFAULT_INCLUDES = -I. -I$(srcdir) -I$(srcdir)/imagehelper
 DEFS = @DEFS@ -DVERSION='"$(PACKAGE_VERSION)"' -DLIB_VERSION='"$(LIB_VERSION)"' -DSYSCONFDIR='"$(sysconfdir)"'
 
-override CFLAGS+=-Wall -Werror
-override CXXFLAGS+=-Wall -Werror
-override LDFLAGS+=-static -static-libgcc
+override CFLAGS+=-Wall -Werror @EXTRA_CFLAG_OVERRIDES@
+override CXXFLAGS+=-Wall -Werror @EXTRA_CFLAG_OVERRIDES@
+override LDFLAGS+=-static @EXTRA_LDFLAG_OVERRIDES@
+override CXX_LDFLAGS+=@EXTRA_CXX_LDFLAG_OVERRIDES@
 
 .SUFFIXES:
 .SUFFIXES: .c .cc .$(O)
@@ -73,7 +74,7 @@ override LDFLAGS+=-static -static-libgcc
 
 LIBIMAGEHELPER = imagehelper/libimagehelper.a
 
-REBASE_OBJS = rebase.$(O) $(LIBOBJS)
+REBASE_OBJS = rebase.$(O) rebase-db.$(O) $(LIBOBJS)
 REBASE_LIBS = $(LIBIMAGEHELPER)
 
 PEFLAGS_OBJS = peflags.$(O) $(LIBOBJS)
@@ -85,15 +86,18 @@ SRC_DISTFILES = aclocal.m4 configure.ac configure Makefile.in \
 	build-aux/config.guess build-aux/config.sub \
 	build-aux/install-sh getopt.h_ getopt_long.c
 
-all: libimagehelper rebase$(EXEEXT) peflags$(EXEEXT) rebaseall peflagsall
+all: libimagehelper rebase$(EXEEXT) \
+  peflags$(EXEEXT) rebaseall peflagsall
 
 libimagehelper:
 	$(MAKE) -C imagehelper imagehelper
 
 rebase$(EXEEXT): $(REBASE_LIBS) $(REBASE_OBJS)
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) -static-libstdc++ -o $@ $(REBASE_OBJS) $(REBASE_LIBS)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(CXX_LDFLAGS) -o $@ $(REBASE_OBJS) $(REBASE_LIBS)
 
-rebase.$(O):: rebase.c Makefile
+rebase.$(O):: rebase.c rebase-db.h Makefile
+
+rebase-db.$(O):: rebase-db.c rebase-db.h Makefile
 
 peflags$(EXEEXT): $(PEFLAGS_OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(PEFLAGS_OBJS)
@@ -104,6 +108,8 @@ getopt.h: getopt.h_
 	cp $^ $@
 
 getopt_long.$(O):: getopt_long.c getopt.h
+
+strtoll.$(O):: strtoll.c
 
 # Autoconf manual says "do not use AC_CONFIG_FILES to replace
 # bindir and friends in your shell scripts"

@@ -25,7 +25,7 @@
 #include <time.h>
 #include <stdlib.h>
 #include <getopt.h>
-#ifdef __CYGWIN__
+#if defined(__CYGWIN__) || defined(__MSYS__)
 #include <sys/cygwin.h>
 #endif
 #include <windows.h>
@@ -34,7 +34,7 @@
 
 using namespace std;
 
-#ifdef __CYGWIN__
+#if defined(__CYGWIN__) || defined(__MSYS__)
 string PosixToWin32(const string& aPosixPath);
 #else
 #define PosixToWin32(aPosixPath) aPosixPath
@@ -67,7 +67,7 @@ main(int argc, char* argv[])
         {
           ULONG64 ImageBase;
           ULONG ImageSize;
-          GetImageInfos64(const_cast<LPSTR>(aFile.c_str()),&ImageBase,&ImageSize);
+          GetImageInfos64(const_cast<LPSTR>(aFile.c_str()),NULL,&ImageBase,&ImageSize);
           cout << aFile << ": " << "ImageBase: 0x" << hex << ImageBase << " ImageSize: 0x" << hex << ImageSize << endl;
         }
       else if (theCheckFlag)

@@ -1,3 +1,39 @@
+2011-07-29  Charles Wilson  <cygwin@cwilson.fastmail.fm>
+
+	Improve MinGW/MSYS support.
+
+	* build-aux/config.guess: Add msys support.
+	* build-aux/config.sub: Add msys support.
+	* configure.ac: Specify -static-* and -D overrides, on a
+	platform-sensitive basis, here rather than hardcoding in
+	Makefile.in. Add strtoll.c to LIBOBJS for MSYS.
+	imagehelper/Makefile.in: Instead of hardcoding -static-* and -D
+	overrides here, use new platform-sensitive vars defined by
+	configure.
+	* Makefile.in: Ditto.  Also, add strtoll.c.
+	imagehelper/rebase_main.cc:  Fix bug in GetImageInfos64 call.
+	Be explicit about CYGWIN vs MSYS.
+	* imagehelper/sections.h: Fix portability issues with stdint.h
+	and uintptr_t.
+	* rebase.c: Handle missing inttypes.h on MSYS. Be explicit about
+	CYGWIN vs MSYS. Move db typedefs and comparison functions to
+	rebase-db.[c,h]. Use standard GPLv2+ text.
+	(strtoull) [MSYS]: Declare missing function.
+	(main) [MSYS]: Allow room for msys-1.0.dll, as with cygwin1.dll.
+	(mkstemp) [MINGW]: Fix open flags.
+	(load_image_info): Fix open flags (O_BINARY).
+	(merge_image_info) [MSYS]: Skip msys-1.0.dll, as with
+	cygwin1.dll.
+	(parse_args) [MINGW]: Use program path to determine location of
+	database.
+	* rebaseall.in: Add platform-specific code to handle msys
+	shortcomings. Use standard GPLv2+ text.
+	* peflagsall.in: Ditto.
+	* peflags.c: Use standard GPLv2+ text.
+	* rebase-db.h: New file.
+	* rebase-db.c: New file.
+	* strtoll.c: New file.
+
 2011-07-25  Corinna Vinschen  <corinna@vinschen.de>
 
 	* rebase.c (print_image_info): Compute length of longest DLL name and

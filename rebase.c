@@ -1,13 +1,20 @@
 /*
  * Copyright (c) 2001, 2002, 2003, 2004, 2008, 2011 Jason Tishler
  *
- * This program is free software; you can redistribute it and/or modify
+ * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * the Free Software Foundation, either version 2 of the License, or
  * (at your option) any later version.
  *
- * A copy of the GNU General Public License can be found at
- * http://www.gnu.org/
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * See the COPYING file for full license information.
  *
  * Written by Jason Tishler <jason@tishler.net>
  *
@@ -17,6 +24,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <stdlib.h>
+#include <limits.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #if defined(__CYGWIN__) || defined(__MSYS__)
@@ -28,12 +36,15 @@
 #include <locale.h>
 #include <getopt.h>
 #include <string.h>
-#include <inttypes.h>
+#if defined(__MSYS__)
+/* MSYS has no inttypes.h */
+# define PRIx64 "llx"
+#else
+# include <inttypes.h>
+#endif
 #include <errno.h>
 #include "imagehelper.h"
-
-#define roundup(x,y)	((((x) + ((y) - 1)) / (y)) * (y))
-#define roundup2(x,y)	(((x) + (y) - 1) & ~((y) - 1))
+#include "rebase-db.h"
 
 BOOL save_image_info ();
 BOOL load_image_info ();
@@ -50,6 +61,11 @@ FILE *file_list_fopen (const char *file_list);
 char *file_list_fgets (char *buf, int size, FILE *file);
 int file_list_fclose (FILE *file);
 void version ();
+
+#if defined(__MSYS__)
+/* MSYS has no strtoull */
+unsigned long long strtoull(const char *, char **, int);
+#endif
 
 #ifdef __x86_64__
 WORD machine = IMAGE_FILE_MACHINE_AMD64;
@@ -70,41 +86,7 @@ const char *stdin_file_list = "-";
 
 const char *progname;
 
-const char IMG_INFO_MAGIC[4] = "rBiI";
-const ULONG IMG_INFO_VERSION = 1;
-
 ULONG ALLOCATION_SLOT;	/* Allocation granularity. */
-
-#pragma pack (push, 4)
-
-typedef struct _img_info_hdr
-{
-  CHAR    magic[4];	/* Always IMG_INFO_MAGIC.                            */
-  WORD    machine;	/* IMAGE_FILE_MACHINE_I386/IMAGE_FILE_MACHINE_AMD64  */
-  WORD    version;	/* Database version, always set to IMG_INFO_VERSION. */
-  ULONG64 base;		/* Base address (-b) used to generate database.      */
-  ULONG   offset;	/* Offset (-o) used to generate database.            */
-  BOOL    down_flag;	/* Always TRUE right now.                            */
-  ULONG   count;	/* Number of img_info_t entries following header.    */
-} img_info_hdr_t;
-
-typedef struct _img_info
-{
-  union {
-    PCHAR   name;	/* Absolute path to DLL.  The strings are stored     */
-    ULONG64 _filler;	/* right after the img_info_t table, in the same     */
-  };			/* order as the img_info_t entries.                  */
-  ULONG   name_size;	/* Length of name string including trailing NUL.     */
-  ULONG64 base;		/* Base address the DLL has been rebased to.         */
-  ULONG   size;		/* Size of the DLL at rebased time.                  */
-  ULONG   slot_size;	/* Size of the DLL rounded to allocation granularity.*/
-  struct {		/* Flags                                             */
-    unsigned needs_rebasing : 1; /* Set to 0 in the database.  Used only     */
-    				 /* while rebasing.                          */
-  } flag;
-} img_info_t;
-
-#pragma pack (pop)
 
 img_info_t *img_info_list = NULL;
 unsigned int img_info_size = 0;
@@ -122,13 +104,22 @@ unsigned int img_info_max_size = 0;
 #else
 #define IMG_INFO_FILE IMG_INFO_FILE_I386
 #endif
-char *db_file = IMG_INFO_FILE;
-char tmp_file[] =     SYSCONFDIR "/rebase.db.XXXXXX";
+char *DB_FILE = IMG_INFO_FILE;
+char TMP_FILE[] = SYSCONFDIR "/rebase.db.XXXXXX";
+char *db_file = NULL;
+char *tmp_file = NULL;
 
-#ifdef __CYGWIN__
+#if defined(__CYGWIN__) || defined(__MSYS__)
 ULONG64 cygwin_dll_image_base = 0;
 ULONG cygwin_dll_image_size = 0;
 #endif
+#if defined(__MSYS__)
+# define CYGWIN_DLL "/usr/bin/msys-1.0.dll"
+#elif defined (__CYGWIN__)
+# define CYGWIN_DLL "/usr/bin/cygwin1.dll"
+#endif
+
+#define LONG_PATH_MAX 32768
 
 void
 gen_progname (const char *arg0)
@@ -160,11 +151,17 @@ main (int argc, char *argv[])
   if (image_storage_flag)
     {
       if (load_image_info () < 0)
-      	return 2;
+	return 2;
       img_info_rebase_start = img_info_size;
     }
 
-#ifdef __CYGWIN__
+#if defined(__MSYS__)
+  if (machine == IMAGE_FILE_MACHINE_I386)
+    {
+      GetImageInfos64 ("/bin/msys-1.0.dll", NULL,
+	               &cygwin_dll_image_base, &cygwin_dll_image_size);
+    }
+#elif defined(__CYGWIN__)
   if (machine == IMAGE_FILE_MACHINE_I386)
     {
       /* Fetch the Cygwin DLLs data to make sure that DLLs aren't rebased
@@ -252,30 +249,13 @@ main (int argc, char *argv[])
   return 0;
 }
 
-int
-img_info_cmp (const void *a, const void *b)
-{
-  ULONG64 abase = ((img_info_t *) a)->base;
-  ULONG64 bbase = ((img_info_t *) b)->base;
-
-  if (abase < bbase)
-    return -1;
-  if (abase > bbase)
-    return 1;
-  return strcmp (((img_info_t *) a)->name, ((img_info_t *) b)->name);
-}
-
-int
-img_info_name_cmp (const void *a, const void *b)
-{
-  return strcmp (((img_info_t *) a)->name, ((img_info_t *) b)->name);
-}
-
-#ifndef __CYGWIN__
+#if !defined(__CYGWIN__) && !defined(__MSYS__)
 int
 mkstemp (char *name)
 {
-  return open (mktemp (name), O_CREAT | O_TRUNC | O_EXCL, 0600);
+  return _open (mktemp (name),
+      O_RDWR | O_BINARY | O_CREAT | O_EXCL | O_TRUNC | _O_SHORT_LIVED,
+      _S_IREAD|_S_IWRITE);
 }
 #endif
 
@@ -308,7 +288,7 @@ save_image_info ()
   hdr.offset = offset;
   hdr.down_flag = down_flag;
   hdr.count = img_info_size;
-  if (write (fd, &hdr, sizeof hdr) < 0)
+  if (write (fd, &hdr, sizeof (hdr)) < 0)
     {
       fprintf (stderr, "%s: failed to write rebase database: %s\n",
 	       progname, strerror (errno));
@@ -336,7 +316,8 @@ save_image_info ()
 	    break;
 	  }
     }
-#ifdef __CYGWIN__
+#if defined(__CYGWIN__) && !defined(__MSYS__)
+  /* fchmod is broken on msys */
   fchmod (fd, 0660);
 #else
   chmod (tmp_file, 0660);
@@ -385,13 +366,13 @@ load_image_info ()
   int i;
   img_info_hdr_t hdr;
 
-  fd = open (db_file, O_RDONLY);
+  fd = open (db_file, O_RDONLY | O_BINARY);
   if (fd < 0)
     {
       /* It's no error if the file doesn't exist.  However, in this case
 	 the -b option is mandatory. */
       if (errno == ENOENT && image_base)
-      	return 0;
+        return 0;
       fprintf (stderr, "%s: failed to open rebase database \"%s\":\n%s\n",
 	       progname, db_file, strerror (errno));
       return -1;
@@ -543,13 +524,13 @@ merge_image_info ()
   for (i = img_info_rebase_start; i + 1 < img_info_size; ++i)
     if ((img_info_list[i].name_size == img_info_list[i + 1].name_size
 	 && !strcmp (img_info_list[i].name, img_info_list[i + 1].name))
-#ifdef __CYGWIN__
-	|| !strcmp (img_info_list[i].name, "/usr/bin/cygwin1.dll")
+#if defined(__CYGWIN__) || defined(__MSYS__)
+	|| !strcmp (img_info_list[i].name, CYGWIN_DLL)
 #endif
        )
       {
 	free (img_info_list[i].name);
-	memmove (img_info_list + i, img_info_list + i + 1, 
+	memmove (img_info_list + i, img_info_list + i + 1,
 		 (img_info_size - i - 1) * sizeof (img_info_t));
 	--img_info_size;
 	--i;
@@ -623,7 +604,7 @@ merge_image_info ()
       if (access (img_info_list[i].name, F_OK) == -1
 	  || !GetImageInfos64 (img_info_list[i].name, NULL,
 			       &cur_base, &cur_size))
-      	{
+	{
 	  free (img_info_list[i].name);
 	  memmove (img_info_list + i, img_info_list + i + 1,
 		   (img_info_size - i - 1) * sizeof (img_info_t));
@@ -688,8 +669,8 @@ merge_image_info ()
 	  new_base = floating_image_base - img_info_list[i].slot_size - offset;
 	  if (new_base >= img_info_list[end].base
 			  + img_info_list[end].slot_size
-#ifdef __CYGWIN__
-	      /* Don't overlap the Cygwin DLL. */
+#if defined(__CYGWIN__) || defined(__MSYS__)
+	      /* Don't overlap the Cygwin/MSYS DLL. */
 	      && (new_base >= cygwin_dll_image_base + cygwin_dll_image_size
 		  || new_base + img_info_list[i].slot_size
 		     <= cygwin_dll_image_base)
@@ -709,7 +690,7 @@ merge_image_info ()
 	}
       /* Nothing matches.  Set floating_image_base to the start of the
 	 uppermost DLL at this point and try again. */
-#ifdef __CYGWIN__
+#if defined(__CYGWIN__) || defined(__MSYS__)
       if (floating_image_base >= cygwin_dll_image_base + cygwin_dll_image_size
 	  && img_info_list[end].base < cygwin_dll_image_base)
 	floating_image_base = cygwin_dll_image_base;
@@ -855,14 +836,14 @@ print_image_info ()
 	if (img_info_list[i].flag.needs_rebasing == 0)
 	  {
 	    free (img_info_list[i].name);
-	    memmove (img_info_list + i, img_info_list + i + 1, 
+	    memmove (img_info_list + i, img_info_list + i + 1,
 		     (img_info_size - i - 1) * sizeof (img_info_t));
 	  }
 	else
 	  {
 	    free (img_info_list[i + 1].name);
 	    if (i + 2 < img_info_size)
-	      memmove (img_info_list + i + 1, img_info_list + i + 2, 
+	      memmove (img_info_list + i + 1, img_info_list + i + 2,
 		       (img_info_size - i - 2) * sizeof (img_info_t));
 	  }
 	--img_info_size;
@@ -934,7 +915,7 @@ rebase (const char *pathname, ULONG64 *new_image_base, BOOL down_flag)
   if (down_flag)
     *new_image_base -= offset;
 
-#ifdef __CYGWIN__
+#if defined(__CYGWIN__) || defined(__MSYS__)
 retry:
 #endif
 
@@ -993,7 +974,7 @@ retry:
       return FALSE;
     }
 
-#ifdef __CYGWIN__
+#if defined(__CYGWIN__) || defined(__MSYS__)
   /* Avoid the case that a DLL is rebased into the address space taken
      by the Cygwin DLL.  Only test in down_flag == TRUE case, otherwise
      the return value in new_image_base is not meaningful */
@@ -1054,11 +1035,11 @@ parse_args (int argc, char *argv[])
 	{
 	case '4':
 	  machine = IMAGE_FILE_MACHINE_I386;
-	  db_file = IMG_INFO_FILE_I386;
+	  DB_FILE = IMG_INFO_FILE_I386;
 	  break;
 	case '8':
 	  machine = IMAGE_FILE_MACHINE_AMD64;
-	  db_file = IMG_INFO_FILE_AMD64;
+	  DB_FILE = IMG_INFO_FILE_AMD64;
 	  break;
 	case 'b':
 	  image_base = string_to_ulonglong (optarg);
@@ -1119,6 +1100,69 @@ parse_args (int argc, char *argv[])
     }
 
   args_index = optind;
+
+  /* Initialize db_file and tmp_file from pattern */
+#if defined(__CYGWIN__) || defined(__MSYS__)
+  /* We don't explicitly free these, but (a) this function is only
+   * called once, and (b) we wouldn't free until exit() anyway, and
+   * that will happen automatically upon process cleanup.
+   */
+  db_file = strdup(DB_FILE);
+  tmp_file = strdup(TMP_FILE);
+#else
+  {
+    char exepath[LONG_PATH_MAX];
+    char* p = NULL;
+    char* p2 = NULL;
+    size_t sz = 0;
+
+    if (!GetModuleFileNameA (NULL, exepath, LONG_PATH_MAX))
+      fprintf (stderr, "%s: can't determine rebase installation path\n",
+	       progname);
+
+    /* strip off exename and trailing slash */
+    sz = strlen (exepath);
+    p = exepath + sz - 1;
+    while (p && (p > exepath) && (*p == '/' || *p == '\\'))
+      {
+        *p = '\0';
+        p--;
+      }
+    p = strrchr(exepath, '/');
+    p2 = strrchr(exepath, '\\');
+    if (p || p2)
+      {
+        if (p2 > p)
+          p = p2;
+        if (p > exepath)
+          *p = '\0';
+        else
+          {
+            p++;
+            *p = '\0';
+          }
+      }
+    sz = strlen (exepath);
+
+    /* We don't explicitly free these, but (a) this function is only
+     * called once, and (b) we wouldn't free until exit() anyway, and
+     * that will happen automatically upon process cleanup.
+     */
+    db_file = (char *) calloc(sz + strlen(DB_FILE) + 1, sizeof(char));
+    tmp_file = (char *) calloc(sz + strlen(TMP_FILE) + 1, sizeof(char));
+    strcpy(db_file, exepath);
+    strcpy(&db_file[sz], DB_FILE);
+    strcpy(tmp_file, exepath);
+    strcpy(&tmp_file[sz], TMP_FILE);
+
+    for (p = db_file; *p != '\0'; p++)
+      if (*p == '/')
+        *p = '\\';
+    for (p = tmp_file; *p != '\0'; p++)
+      if (*p == '/')
+        *p = '\\';
+  }
+#endif
 }
 
 unsigned long long
@@ -1281,3 +1325,4 @@ version ()
   fprintf (stderr, "Copyright (c) 2001, 2002, 2003, 2004, 2008, 2011 "
 	   "Ralf Habacker, Jason Tishler, et al.\n");
 }
+

@@ -34,7 +34,8 @@ AC_CHECK_DECLS([cygwin_conv_path], [],[
 
 LIBOBJS=
 case "$host" in
-  *msys* ) AC_LIBOBJ([getopt_long]) ;;
+  *msys* ) AC_LIBOBJ([getopt_long])
+           AC_LIBOBJ([strtoll]) ;;
 esac
 AC_SUBST([LIBOBJS])
 
@@ -43,6 +44,24 @@ case "$host" in
  *)			DEFAULT_OFFSET_VALUE=0 ;;
 esac
 AC_SUBST(DEFAULT_OFFSET_VALUE)
+
+case "$host" in
+ *msys*   )	EXTRA_CFLAG_OVERRIDES=
+		EXTRA_LDFLAG_OVERRIDES="-static-libgcc"
+		EXTRA_CXX_LDFLAG_OVERRIDES=
+   ;;
+ *cygwin* )	EXTRA_CFLAG_OVERRIDES=
+		EXTRA_LDFLAG_OVERRIDES="-static-libgcc"
+		EXTRA_CXX_LDFLAG_OVERRIDES="-static-libstdc++"
+   ;;
+ *mingw*  )	EXTRA_CFLAG_OVERRIDES="-D__USE_MINGW_ANSI_STDIO"
+		EXTRA_LDFLAG_OVERRIDES="-static-libgcc"
+		EXTRA_CXX_LDFLAG_OVERRIDES="-static-libstdc++"
+   ;;
+esac
+AC_SUBST(EXTRA_CFLAG_OVERRIDES)
+AC_SUBST(EXTRA_LDFLAG_OVERRIDES)
+AC_SUBST(EXTRA_CXX_LDFLAG_OVERRIDES)
 
 AC_CONFIG_FILES([Makefile
                  imagehelper/Makefile])
