@@ -67,7 +67,10 @@ ObjectFile::ObjectFile(const char *aFileName, bool writeable)
   PCWSTR win32_path = Win32Path(aFileName);
 
   // search for raw filename
-  hfile = CreateFileW(win32_path, writeable ? GENERIC_READ | GENERIC_WRITE : GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL,0);
+  hfile = CreateFileW(win32_path,
+		      writeable ? GENERIC_READ | GENERIC_WRITE : GENERIC_READ,
+		      FILE_SHARE_READ, NULL, OPEN_EXISTING,
+		      FILE_ATTRIBUTE_NORMAL | FILE_FLAG_BACKUP_SEMANTICS, NULL);
   if (hfile != INVALID_HANDLE_VALUE)
     FileName = strdup(aFileName);
 
@@ -89,7 +92,10 @@ ObjectFile::ObjectFile(const char *aFileName, bool writeable)
           strcat(name,basename);
           if (debug)
             std::cerr << __FUNCTION__ << ": name:" << name << std::endl;
-          hfile = CreateFileW(win32_path, writeable ? GENERIC_READ | GENERIC_WRITE : GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL,0);
+          hfile = CreateFileW(win32_path,
+		      writeable ? GENERIC_READ | GENERIC_WRITE : GENERIC_READ,
+		      FILE_SHARE_READ, NULL, OPEN_EXISTING,
+		      FILE_ATTRIBUTE_NORMAL | FILE_FLAG_BACKUP_SEMANTICS, NULL);
           // found
           if (hfile != INVALID_HANDLE_VALUE)
             break;
