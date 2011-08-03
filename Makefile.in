@@ -77,6 +77,9 @@ LIBIMAGEHELPER = imagehelper/libimagehelper.a
 REBASE_OBJS = rebase.$(O) rebase-db.$(O) $(LIBOBJS)
 REBASE_LIBS = $(LIBIMAGEHELPER)
 
+REBASE_DUMP_OBJS = rebase-dump.$(O) rebase-db.$(O) $(LIBOBJS)
+REBASE_DUMP_LIBS =
+
 PEFLAGS_OBJS = peflags.$(O) $(LIBOBJS)
 PEFLAGS_LIBS =
 
@@ -86,7 +89,7 @@ SRC_DISTFILES = aclocal.m4 configure.ac configure Makefile.in \
 	build-aux/config.guess build-aux/config.sub \
 	build-aux/install-sh getopt.h_ getopt_long.c
 
-all: libimagehelper rebase$(EXEEXT) \
+all: libimagehelper rebase$(EXEEXT) rebase-dump$(EXEEXT) \
   peflags$(EXEEXT) rebaseall peflagsall
 
 libimagehelper:
@@ -98,6 +101,11 @@ rebase$(EXEEXT): $(REBASE_LIBS) $(REBASE_OBJS)
 rebase.$(O):: rebase.c rebase-db.h Makefile
 
 rebase-db.$(O):: rebase-db.c rebase-db.h Makefile
+
+rebase-dump$(EXEEXT): $(REBASE_DUMP_OBJS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(REBASE_DUMP_OBJS) $(REBASE_DUMP_LIBS)
+
+rebase-dump.$(O):: rebase-dump.c rebase-db.h Makefile
 
 peflags$(EXEEXT): $(PEFLAGS_OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(PEFLAGS_OBJS)
@@ -182,7 +190,8 @@ dist: srcdist
 
 .PHONY: clean
 clean:
-	$(RM) *.$(O) rebase$(EXEEXT) peflags$(EXEEXT) *.tmp 
+	$(RM) *.$(O) *.tmp 
+	$(RM) rebase$(EXEEXT) peflags$(EXEEXT) rebase-dump$(EXEEXT)
 	$(RM) rebaseall peflagsall
 
 .PHONY: realclean

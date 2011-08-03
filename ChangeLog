@@ -1,3 +1,15 @@
+2011-08-03  Charles Wilson  <cygwin@cwilson.fastmail.fm>
+
+	Add rebase-dump application.
+
+	* Makefile.in: Add rules to build, but not install,
+	rebase-dump.exe.
+	* rebase-db.h: Declare new dump_rebasedb* functions.
+	* rebase-db.c (dump_rebasedb_header): New function.
+	(dump_rebasedb_entry): New function.
+	(dump_rebasedb): New function.
+	* rebase-dump.c: New file.
+
 2011-07-29  Charles Wilson  <cygwin@cwilson.fastmail.fm>
 
 	Improve MinGW/MSYS support.

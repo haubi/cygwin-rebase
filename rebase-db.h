@@ -20,6 +20,7 @@
 #define REBASE_DB_H
 
 #include <windows.h>
+#include <stdio.h>
 
 #define roundup(x,y)	((((x) + ((y) - 1)) / (y)) * (y))
 #define roundup2(x,y)	(((x) + (y) - 1) & ~((y) - 1))
@@ -64,6 +65,12 @@ typedef struct _img_info
 
 int img_info_cmp (const void *a, const void *b);
 int img_info_name_cmp (const void *a, const void *b);
+
+void dump_rebasedb_header (FILE *f, img_info_hdr_t const *h);
+void dump_rebasedb_entry  (FILE *f, img_info_hdr_t const *h,
+                           img_info_t const *entry);
+void dump_rebasedb (FILE *f, img_info_hdr_t const *h,
+                    img_info_t const *list, unsigned int sz);
 
 #ifdef __cplusplus
 }
