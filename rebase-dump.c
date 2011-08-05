@@ -124,8 +124,8 @@ load_image_info ()
       return -1;
     }
   if (verbose)
-    printf ("== read %u (0x%08x) bytes (database header)\n",
-	    sizeof hdr, sizeof hdr);
+    printf ("== read %" PRIu64 " (0x%08" PRIx64 ") bytes (database header)\n",
+	    (unsigned long long) sizeof hdr, (unsigned long long) sizeof hdr);
 
   /* Check the header. */
   if (memcmp (hdr.magic, IMG_INFO_MAGIC, 4) != 0)
@@ -178,9 +178,9 @@ load_image_info ()
     }
   if (ret == 0 && verbose)
     {
-      printf ("== read %u (0x%08x) bytes (database w/o strings)\n",
-              img_info_size * sizeof (img_info_t),
-              img_info_size * sizeof (img_info_t));
+      printf ("== read %" PRIu64 " (0x%08" PRIx64 ") bytes (database w/o strings)\n",
+              (unsigned long long) img_info_size * sizeof (img_info_t),
+              (unsigned long long) img_info_size * sizeof (img_info_t));
     }
   /* Make sure all pointers are NULL (also dump db as read) */
   if (ret == 0)

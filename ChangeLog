@@ -1,3 +1,11 @@
+2011-08-05  Corinna Vinschen  <corinna@vinschen.de>
+
+	* rebase-db.h (PRIu64, PRIx64): Define for msys, otherwise include
+	inttypes.h.
+	* rebase-dump.c (load_image_info): Use PRI{u,x}64 in printf statement
+	to avoid compiler warnings.
+	* rebase.c (PRIx64):" Remove definition here.
+
 2011-08-03  Charles Wilson  <cygwin@cwilson.fastmail.fm>
 
 	Add rebase-dump application.

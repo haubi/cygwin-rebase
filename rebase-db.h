@@ -21,6 +21,13 @@
 
 #include <windows.h>
 #include <stdio.h>
+#if defined(__MSYS__)
+/* MSYS has no inttypes.h */
+# define PRIu64 "llu"
+# define PRIx64 "llx"
+#else
+# include <inttypes.h>
+#endif
 
 #define roundup(x,y)	((((x) + ((y) - 1)) / (y)) * (y))
 #define roundup2(x,y)	(((x) + (y) - 1) & ~((y) - 1))

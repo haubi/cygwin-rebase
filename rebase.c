@@ -36,12 +36,6 @@
 #include <locale.h>
 #include <getopt.h>
 #include <string.h>
-#if defined(__MSYS__)
-/* MSYS has no inttypes.h */
-# define PRIx64 "llx"
-#else
-# include <inttypes.h>
-#endif
 #include <errno.h>
 #include "imagehelper.h"
 #include "rebase-db.h"
