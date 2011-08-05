@@ -1,10 +1,16 @@
+2011-08-05  Charles Wilson  <cygwin@cwilson.fastmail.fm>
+
+	* NEWS: Update documentation.
+	* README: Ditto.
+	* ChangeLog: Fix some typos.
+
 2011-08-05  Corinna Vinschen  <corinna@vinschen.de>
 
 	* rebase-db.h (PRIu64, PRIx64): Define for msys, otherwise include
 	inttypes.h.
 	* rebase-dump.c (load_image_info): Use PRI{u,x}64 in printf statement
 	to avoid compiler warnings.
-	* rebase.c (PRIx64):" Remove definition here.
+	* rebase.c (PRIx64): Remove definition here.
 
 2011-08-03  Charles Wilson  <cygwin@cwilson.fastmail.fm>
 
@@ -27,7 +33,7 @@
 	* configure.ac: Specify -static-* and -D overrides, on a
 	platform-sensitive basis, here rather than hardcoding in
 	Makefile.in. Add strtoll.c to LIBOBJS for MSYS.
-	imagehelper/Makefile.in: Instead of hardcoding -static-* and -D
+	* imagehelper/Makefile.in: Instead of hardcoding -static-* and -D
 	overrides here, use new platform-sensitive vars defined by
 	configure.
 	* Makefile.in: Ditto.  Also, add strtoll.c.
@@ -57,7 +63,7 @@
 2011-07-25  Corinna Vinschen  <corinna@vinschen.de>
 
 	* rebase.c (print_image_info): Compute length of longest DLL name and
-	use as field width in printf.  Default to longest available fiel length
+	use as field width in printf.  Default to longest available file length
 	for 80 char display.
 
 2011-07-25  Corinna Vinschen  <corinna@vinschen.de>
@@ -204,7 +210,7 @@
 
 	* Makefile.in (all): Prepend libimagehelper target to dependency list.
 	(libimagehelper): Rename from $(LIBIMAGEHELPER) to allow imagehelper
-	Makefile to decide if imagejhelper lib has to be rebuilt.
+	Makefile to decide if imagehelper lib has to be rebuilt.
 
 2011-06-21  Corinna Vinschen  <corinna@vinschen.de>
 

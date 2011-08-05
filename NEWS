@@ -1,5 +1,13 @@
 $Id$
 
+x.y.z
+==============================================================================
+    * rebase and peflags now support operations on 64bit objects
+    * New database functionality (see README)
+    * New developer application rebase-dump for displaying database contents
+    * New platform support: x86_64-w64-mingw32, i686-pc-msys
+    * Many algorithm improvements
+
 3.0.2
 ==============================================================================
     * Autoconfify. Silence build warnings. Add support for building (natively,
