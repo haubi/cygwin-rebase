@@ -29,25 +29,34 @@
 #include <unistd.h>
 #include <getopt.h>
 #include <errno.h>
+#if defined (__CYGWIN__) || defined (__MSYS__)
+#include <sys/mman.h>
+#endif
 
 #include <windows.h>
 
-#if defined(__MSYS__)
-typedef unsigned short uint16_t;
-typedef unsigned int   uint32_t;
+/* Fix broken definitions in older w32api. */
+#ifndef IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE
+#define IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE IMAGE_DLL_CHARACTERISTICS_DYNAMIC_BASE
+#endif
+#ifndef IMAGE_DLLCHARACTERISTICS_NX_COMPAT
+#define IMAGE_DLLCHARACTERISTICS_NX_COMPAT IMAGE_DLL_CHARACTERISTICS_NX_COMPAT
+#endif
+#ifndef IMAGE_DLLCHARACTERISTICS_FORCE_INTEGRITY
+#define IMAGE_DLLCHARACTERISTICS_FORCE_INTEGRITY IMAGE_DLL_CHARACTERISTICS_FORCE_INTEGRITY
 #endif
 
-static uint16_t coff_characteristics_set;
-static uint16_t coff_characteristics_clr;
-static uint16_t coff_characteristics_show;
-static uint16_t pe_characteristics_set;
-static uint16_t pe_characteristics_clr;
-static uint16_t pe_characteristics_show;
+static WORD coff_characteristics_set;
+static WORD coff_characteristics_clr;
+static WORD coff_characteristics_show;
+static WORD pe_characteristics_set;
+static WORD pe_characteristics_clr;
+static WORD pe_characteristics_show;
 
 typedef struct {
   long          flag;
   const char *  name;
-  uint32_t      len;
+  size_t        len;
 } symbolic_flags_t;
 
 #define CF(flag,name) { flag, #name, sizeof(#name) - 1 }
@@ -118,29 +127,26 @@ static void version (FILE *f);
 
 int do_mark (const char *pathname);
 int get_characteristics(const char *pathname,
-                        uint16_t* coff_characteristics,
-                        uint16_t* pe_characteristics);
+                        WORD* coff_characteristics,
+                        WORD* pe_characteristics);
 int set_coff_characteristics(const char *pathname,
-                             uint16_t coff_characteristics);
+                             WORD coff_characteristics);
 int set_pe_characteristics(const char *pathname,
-                           uint16_t pe_characteristics);
-static int pe_get16 (int fd, off_t offset, uint16_t* value);
-static int pe_get32 (int fd, off_t offset, uint32_t* value);
-static int pe_set16 (int fd, off_t offset, uint16_t value);
+                           WORD pe_characteristics);
 
 static void display_flags (const char *field_name, const symbolic_flags_t *syms,
-                           uint16_t show_symbolic, uint16_t old_flag_value,
-			   uint16_t new_flag_value);
+                           WORD show_symbolic, WORD old_flag_value,
+			   WORD new_flag_value);
 static char *symbolic_flags (const symbolic_flags_t *syms, long show, long value);
 static void append_and_decorate (char **str, int is_set, const char *name, int len);
 static void *xmalloc (size_t num);
 #define XMALLOC(type, num)      ((type *) xmalloc ((num) * sizeof(type)))
 static void handle_coff_flag_option (const char *option_name,
                                      const char *option_arg,
-                                     uint16_t   flag_value);
+                                     WORD   flag_value);
 static void handle_pe_flag_option (const char *option_name,
                                    const char *option_arg,
-                                   uint16_t   flag_value);
+                                   WORD   flag_value);
 void parse_args (int argc, char *argv[]);
 int string_to_bool  (const char *string, int *value);
 int string_to_ulong (const char *string, unsigned long *value);
@@ -221,10 +227,10 @@ do_mark (const char *pathname)
   int has_relocs;
   int is_executable;
   int is_dll;
-  uint16_t old_coff_characteristics;
-  uint16_t new_coff_characteristics;
-  uint16_t old_pe_characteristics;
-  uint16_t new_pe_characteristics;
+  WORD old_coff_characteristics;
+  WORD new_coff_characteristics;
+  WORD old_pe_characteristics;
+  WORD new_pe_characteristics;
 
   /* Skip if file does not exist */
   if (access (pathname, F_OK) == -1)
@@ -270,8 +276,8 @@ do_mark (const char *pathname)
   if (!has_relocs)
     {
       if (verbose
-         && (new_pe_characteristics & IMAGE_DLL_CHARACTERISTICS_DYNAMIC_BASE)
-         && (old_pe_characteristics & IMAGE_DLL_CHARACTERISTICS_DYNAMIC_BASE))
+         && (new_pe_characteristics & IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE)
+         && (old_pe_characteristics & IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE))
         {
           fprintf (stderr,
                    "Warning: file has no relocation info but has dynbase set (%s).\n",
@@ -295,8 +301,8 @@ do_mark (const char *pathname)
       /* validation and warnings about things we are changing */
       if (!has_relocs)
         {
-          if (   (new_pe_characteristics & IMAGE_DLL_CHARACTERISTICS_DYNAMIC_BASE)
-             && !(old_pe_characteristics & IMAGE_DLL_CHARACTERISTICS_DYNAMIC_BASE))
+          if (   (new_pe_characteristics & IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE)
+             && !(old_pe_characteristics & IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE))
             {
               fprintf (stderr,
                        "Warning: setting dynbase on file with no relocation info (%s).\n",
@@ -359,8 +365,8 @@ do_mark (const char *pathname)
 
 static void
 display_flags (const char *field_name, const symbolic_flags_t *syms,
-               uint16_t show_symbolic, uint16_t old_flag_value,
-	       uint16_t new_flag_value)
+               WORD show_symbolic, WORD old_flag_value,
+	       WORD new_flag_value)
 {
   if (show_symbolic)
     {
@@ -464,7 +470,7 @@ xmalloc (size_t num)
 static void
 handle_pe_flag_option (const char *option_name,
                        const char *option_arg,
-                       uint16_t   flag_value)
+                       WORD   flag_value)
 {
   int bool_value;
   if (!option_arg)
@@ -490,7 +496,7 @@ handle_pe_flag_option (const char *option_name,
 static void
 handle_coff_flag_option (const char *option_name,
                          const char *option_arg,
-                         uint16_t   flag_value)
+                         WORD   flag_value)
 {
   int bool_value;
   if (!option_arg)
@@ -539,12 +545,12 @@ parse_args (int argc, char *argv[])
 	case 'd':
 	  handle_pe_flag_option (long_options[option_index].name,
 	                         optarg,
-	                         IMAGE_DLL_CHARACTERISTICS_DYNAMIC_BASE);
+	                         IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE);
 	  break;
 	case 'n':
 	  handle_pe_flag_option (long_options[option_index].name,
 	                         optarg,
-	                         IMAGE_DLL_CHARACTERISTICS_NX_COMPAT);
+	                         IMAGE_DLLCHARACTERISTICS_NX_COMPAT);
 	  break;
 	case 't':
 	  handle_pe_flag_option (long_options[option_index].name,
@@ -554,7 +560,7 @@ parse_args (int argc, char *argv[])
 	case 'f':
 	  handle_pe_flag_option (long_options[option_index].name,
 	                         optarg,
-	                         IMAGE_DLL_CHARACTERISTICS_FORCE_INTEGRITY);
+	                         IMAGE_DLLCHARACTERISTICS_FORCE_INTEGRITY);
 	  break;
 	case 'i':
 	  handle_pe_flag_option (long_options[option_index].name,
@@ -678,144 +684,137 @@ string_to_ulong (const char *string, unsigned long *value)
   return 0;
 }
 
+#if !defined (__CYGWIN__) && !defined (__MSYS__)
+/* Minimal mmap on files for Win32 */
+#define PROT_READ 0
+#define PROT_WRITE 1
+#define MAP_SHARED 0
+#define MAP_FAILED NULL
+
+void *
+mmap (void *addr, size_t length, int prot, int flags, int fd, off_t offset)
+{
+  HANDLE fh = (HANDLE) _get_osfhandle (fd);
+  HANDLE h = CreateFileMapping (fh, NULL, prot ? PAGE_READWRITE : PAGE_READONLY,
+				0, 0, NULL);
+  if (!h)
+    return MAP_FAILED;
+  addr = MapViewOfFileEx (h, prot ? FILE_MAP_WRITE : FILE_MAP_READ,
+			  0, 0, 4096, addr);
+  CloseHandle (h);
+  return addr;
+}
+
+int
+munmap (void *addr, size_t len)
+{
+  UnmapViewOfFile (addr);
+  return 0;
+}
+#endif
+
+typedef struct
+{
+  PIMAGE_DOS_HEADER dosheader;
+  union
+    {
+      PIMAGE_NT_HEADERS32 ntheader32;
+      PIMAGE_NT_HEADERS64 ntheader64;
+    };
+  BOOL is_64bit;
+} pe_file;
+
+pe_file *
+pe_open (const char *path, BOOL writing)
+{
+  /* Non-threaded application. */
+  static pe_file pef;
+  int fd;
+  void *map;
+  
+  fd = open (path, O_BINARY | (writing ? O_RDWR : O_RDONLY));
+  if (fd == -1)
+    return NULL;
+  map = mmap (NULL, 4096, PROT_READ | (writing ? PROT_WRITE : 0), MAP_SHARED,
+	      fd, 0);
+  if (map == MAP_FAILED)
+    {
+      close (fd);
+      return NULL;
+    }
+  pef.dosheader = (PIMAGE_DOS_HEADER) map;
+  pef.ntheader32 = (PIMAGE_NT_HEADERS32)
+		   ((PBYTE) pef.dosheader + pef.dosheader->e_lfanew);
+  /* Sanity checks */
+  if (pef.dosheader->e_magic != 0x5a4d	/* "MZ" */
+      || (PBYTE) pef.ntheader32 - (PBYTE) map + sizeof *pef.ntheader32 >= 4096
+      || pef.ntheader32->Signature != 0x00004550)
+    {
+      munmap (map, 4096);
+      close (fd);
+      return NULL;
+    }
+  pef.is_64bit = pef.ntheader32->OptionalHeader.Magic
+		 == IMAGE_NT_OPTIONAL_HDR64_MAGIC;
+  return &pef;
+}
+
+void
+pe_close (pe_file *pep)
+{
+  if (pep)
+    munmap ((void *) pep->dosheader, 4096);
+}
+
 int
 get_characteristics(const char *pathname,
-                    uint16_t* coff_characteristics,
-                    uint16_t* pe_characteristics)
+                    WORD* coff_characteristics,
+                    WORD* pe_characteristics)
 {
-  uint32_t pe_header_offset, opthdr_ofs;
-  int status = 1;
-  int fd;
-  uint32_t pe_sig;
-
-  fd = open (pathname, O_RDONLY|O_BINARY);
-  if (fd == -1)
-    return status;
-
-  if (pe_get32 (fd, 0x3c, &pe_header_offset) != 0)
-    goto done;
-  opthdr_ofs = pe_header_offset + 4 + 20;
-
-  pe_sig = 0;
-  if (pe_get32 (fd, pe_header_offset, &pe_sig) != 0)
-    goto done;
-  if (pe_sig != IMAGE_NT_SIGNATURE)
-    goto done;
-
-  if (pe_get16 (fd, pe_header_offset + 4 + 18, coff_characteristics) != 0)
-    goto done;
-
-  if (pe_get16 (fd, opthdr_ofs + 70, pe_characteristics) != 0)
-    goto done;
-
-  status = 0;
-
-done:
-  close (fd);
-  return status;
+  pe_file *pep = pe_open (pathname, FALSE);
+  if (!pep)
+    return 1;
+  if (pep->is_64bit)
+    {
+      *coff_characteristics = pep->ntheader64->FileHeader.Characteristics;
+      *pe_characteristics = pep->ntheader64->OptionalHeader.DllCharacteristics;
+    }
+  else
+    {
+      *coff_characteristics = pep->ntheader32->FileHeader.Characteristics;
+      *pe_characteristics = pep->ntheader32->OptionalHeader.DllCharacteristics;
+    }
+  pe_close (pep);
+  return 0;
 }
 
 int
 set_coff_characteristics(const char *pathname,
-                         uint16_t coff_characteristics)
+                         WORD coff_characteristics)
 {
-  uint32_t pe_header_offset;
-  int status = 1;
-  int fd;
-
-  /* no extra checking of file's contents below, because
-     get_characteristics already did that */
-  fd = open (pathname, O_RDWR|O_BINARY);
-  if (fd == -1)
-    return status;
-
-  if (pe_get32 (fd, 0x3c, &pe_header_offset) != 0)
-    goto done;
-
-  if (pe_set16 (fd, pe_header_offset + 4 + 18, coff_characteristics) != 0)
-    {
-      fprintf (stderr,
-               "CATASTROPIC ERROR: attempt to write to file failed! %s could be corrupted; HALTING.\n",
-               pathname);
-      close (fd);
-      exit(2);
-    }
-
-  status = 0;
-
-done:
-  close (fd);
-  return status;
+  pe_file *pep = pe_open (pathname, TRUE);
+  if (!pep)
+    return 1;
+  if (pep->is_64bit)
+    pep->ntheader64->FileHeader.Characteristics = coff_characteristics;
+  else
+    pep->ntheader32->FileHeader.Characteristics = coff_characteristics;
+  pe_close (pep);
+  return 0;
 }
 
 int
 set_pe_characteristics(const char *pathname,
-                       uint16_t pe_characteristics)
+                       WORD pe_characteristics)
 {
-  uint32_t pe_header_offset, opthdr_ofs;
-  int status = 1;
-  int fd;
-
-  /* no extra checking of file's contents below, because
-     get_characteristics already did that */
-  fd = open (pathname, O_RDWR|O_BINARY);
-  if (fd == -1)
-    return status;
-
-  if (pe_get32 (fd, 0x3c, &pe_header_offset) != 0)
-    goto done;
-  opthdr_ofs = pe_header_offset + 4 + 20;
-
-  if (pe_set16 (fd, opthdr_ofs + 70, pe_characteristics) != 0)
-    {
-      fprintf (stderr,
-               "CATASTROPIC ERROR: attempt to write to file failed! %s could be corrupted; HALTING.\n",
-               pathname);
-      close (fd);
-      exit(2);
-    }
-
-  status = 0;
-
-done:
-  close (fd);
-  return status;
-}
-
-static int 
-pe_get16 (int fd, off_t offset, uint16_t* value)
-{
-  unsigned char b[2];
-  if (lseek (fd, offset, SEEK_SET) == -1)
+  pe_file *pep = pe_open (pathname, TRUE);
+  if (!pep)
     return 1;
-  if (read (fd, b, 2) != 2)
-    return 1;
-  *value = b[0] + (b[1]<<8);
-  return 0;
-}
-
-static int 
-pe_get32 (int fd, off_t offset, uint32_t* value)
-{
-  unsigned char b[4];
-  if (lseek (fd, offset, SEEK_SET) == -1)
-    return 1;
-  if (read (fd, b, 4) != 4)
-    return 1;
-  *value = b[0] + (b[1]<<8) + (b[2]<<16) + (b[3]<<24);
-  return 0;
-}
-
-static int 
-pe_set16 (int fd, off_t offset, uint16_t value)
-{
-  unsigned char b[2];
-  b[0] = (unsigned char) (value & 0x00ff);
-  b[1] = (unsigned char) ((value>>8) & 0x00ff);
-  if (lseek (fd, offset, SEEK_SET) == -1)
-    return 1;
-  if (write (fd, b, 2) != 2)
-    return 1;
+  if (pep->is_64bit)
+    pep->ntheader64->OptionalHeader.DllCharacteristics = pe_characteristics;
+  else
+    pep->ntheader32->OptionalHeader.DllCharacteristics = pe_characteristics;
+  pe_close (pep);
   return 0;
 }
 

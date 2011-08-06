@@ -1,3 +1,25 @@
+2011-08-05  Corinna Vinschen  <corinna@vinschen.de>
+
+	* peflags.c: Include sys/mman.h on Cygwin and msys.  Drop conditional
+	definitions of uint16_t and uint32_t.  Use WORD rather than uint16_t
+	throughout, size_t rather than uint32_t.
+	(IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE): Define if non-existant to
+	workaround broken w32api.  Fix usage of broken definition throughout.
+	(IMAGE_DLLCHARACTERISTICS_NX_COMPAT): Ditto.
+	(IMAGE_DLLCHARACTERISTICS_FORCE_INTEGRITY): Ditto.
+	(pe_get16): Remove.
+	(pe_get32): Remove.
+	(pe_set16): Remove.
+	(mmap): Define in terms of Win32 calls for non-Cygwin systems.
+	(munmap): Ditto.
+	(pe_file): New type to keep file mapping info.
+	(pe_open): New function to mmap PE/COFF files.
+	(pe_close): New function to unmap PE/COFF files.
+	(get_characteristics): Use pe_opem/pe_close and direct Windows
+	file structure access.
+	(set_coff_characteristics): Ditto.
+	(set_pe_characteristics): Ditto.
+
 2011-08-05  Charles Wilson  <cygwin@cwilson.fastmail.fm>
 
 	* NEWS: Update documentation.
