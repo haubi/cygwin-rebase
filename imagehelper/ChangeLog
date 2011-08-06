@@ -3,6 +3,18 @@
 	* objectfile.cc (ObjectFile::ObjectFile); Always open file with
 	FILE_FLAG_BACKUP_SEMANTICS rights.
 
+2011-07-29  Charles Wilson  <cygwin@cwilson.fastmail.fm>
+
+	Improve MinGW/MSYS support.
+
+	* Makefile.in: Instead of hardcoding -static-* and -D
+	overrides here, use new platform-sensitive vars defined by
+	configure.
+	* rebase_main.cc: Fix bug in GetImageInfos64 call.
+	Be explicit about CYGWIN vs MSYS.
+	* sections.h: Fix portability issues with stdint.h
+	and uintptr_t.
+
 2011-07-10  Corinna Vinschen  <corinna@vinschen.de>
 
 	* objectfile.cc (ObjectFile::ObjectFile): Add basic executable file

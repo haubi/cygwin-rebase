@@ -55,14 +55,9 @@
 	* configure.ac: Specify -static-* and -D overrides, on a
 	platform-sensitive basis, here rather than hardcoding in
 	Makefile.in. Add strtoll.c to LIBOBJS for MSYS.
-	* imagehelper/Makefile.in: Instead of hardcoding -static-* and -D
+	* Makefile.in: Instead of hardcoding -static-* and -D
 	overrides here, use new platform-sensitive vars defined by
-	configure.
-	* Makefile.in: Ditto.  Also, add strtoll.c.
-	imagehelper/rebase_main.cc:  Fix bug in GetImageInfos64 call.
-	Be explicit about CYGWIN vs MSYS.
-	* imagehelper/sections.h: Fix portability issues with stdint.h
-	and uintptr_t.
+	configure.  Also, add strtoll.c.
 	* rebase.c: Handle missing inttypes.h on MSYS. Be explicit about
 	CYGWIN vs MSYS. Move db typedefs and comparison functions to
 	rebase-db.[c,h]. Use standard GPLv2+ text.
