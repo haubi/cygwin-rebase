@@ -53,6 +53,17 @@ static WORD pe_characteristics_set;
 static WORD pe_characteristics_clr;
 static WORD pe_characteristics_show;
 
+typedef struct
+{
+  PIMAGE_DOS_HEADER dosheader;
+  union
+    {
+      PIMAGE_NT_HEADERS32 ntheader32;
+      PIMAGE_NT_HEADERS64 ntheader64;
+    };
+  BOOL is_64bit;
+} pe_file;
+
 typedef struct {
   long          flag;
   const char *  name;
@@ -126,12 +137,14 @@ static void help (FILE *f);
 static void version (FILE *f);
 
 int do_mark (const char *pathname);
-int get_characteristics(const char *pathname,
+pe_file *pe_open (const char *path, BOOL writing);
+void pe_close (pe_file *pep);
+int get_characteristics(const pe_file *pep,
                         WORD* coff_characteristics,
                         WORD* pe_characteristics);
-int set_coff_characteristics(const char *pathname,
+int set_coff_characteristics(const pe_file *pep,
                              WORD coff_characteristics);
-int set_pe_characteristics(const char *pathname,
+int set_pe_characteristics(const pe_file *pep,
                            WORD pe_characteristics);
 
 static void display_flags (const char *field_name, const symbolic_flags_t *syms,
@@ -227,6 +240,7 @@ do_mark (const char *pathname)
   int has_relocs;
   int is_executable;
   int is_dll;
+  int ret = 0;
   WORD old_coff_characteristics;
   WORD new_coff_characteristics;
   WORD old_pe_characteristics;
@@ -249,14 +263,23 @@ do_mark (const char *pathname)
         }
     }
 
-  if (get_characteristics (pathname,
+  pe_file *pep = pe_open (pathname, mark_any != 0);
+  if (!pep)
+    {
+      fprintf (stderr,
+               "%s: skipped because could not open\n",
+               pathname);
+      return 0;
+    }
+
+  if (get_characteristics (pep,
                            &old_coff_characteristics,
                            &old_pe_characteristics) != 0)
     {
       fprintf (stderr,
                "%s: skipped because could not read file characteristics\n",
                pathname);
-      return 0;
+      goto out;
     }
   new_coff_characteristics = old_coff_characteristics;
   new_coff_characteristics |= coff_characteristics_set;
@@ -323,20 +346,22 @@ do_mark (const char *pathname)
 
       /* setting */
       if (new_coff_characteristics != old_coff_characteristics)
-        if (set_coff_characteristics (pathname,new_coff_characteristics) != 0)
+        if (set_coff_characteristics (pep, new_coff_characteristics) != 0)
           {
             fprintf (stderr,
                      "Error: could not update coff characteristics (%s): %s\n",
                       pathname, strerror (errno));
-            return 1;
+            ret = 1;
+	    goto out;
           }
       if (new_pe_characteristics != old_pe_characteristics)
-        if (set_pe_characteristics (pathname,new_pe_characteristics) != 0)
+        if (set_pe_characteristics (pep, new_pe_characteristics) != 0)
           {
             fprintf (stderr,
                      "Error: could not update pe characteristics (%s): %s\n",
                       pathname, strerror (errno));
-            return 1;
+            ret = 1;
+	    goto out;
           }
     }
 
@@ -360,7 +385,9 @@ do_mark (const char *pathname)
       puts ("");
     }
 
-  return 0;
+out:
+  pe_close (pep);
+  return ret;
 }
 
 static void
@@ -713,17 +740,6 @@ munmap (void *addr, size_t len)
 }
 #endif
 
-typedef struct
-{
-  PIMAGE_DOS_HEADER dosheader;
-  union
-    {
-      PIMAGE_NT_HEADERS32 ntheader32;
-      PIMAGE_NT_HEADERS64 ntheader64;
-    };
-  BOOL is_64bit;
-} pe_file;
-
 pe_file *
 pe_open (const char *path, BOOL writing)
 {
@@ -767,13 +783,10 @@ pe_close (pe_file *pep)
 }
 
 int
-get_characteristics(const char *pathname,
+get_characteristics(const pe_file *pep,
                     WORD* coff_characteristics,
                     WORD* pe_characteristics)
 {
-  pe_file *pep = pe_open (pathname, FALSE);
-  if (!pep)
-    return 1;
   if (pep->is_64bit)
     {
       *coff_characteristics = pep->ntheader64->FileHeader.Characteristics;
@@ -784,37 +797,28 @@ get_characteristics(const char *pathname,
       *coff_characteristics = pep->ntheader32->FileHeader.Characteristics;
       *pe_characteristics = pep->ntheader32->OptionalHeader.DllCharacteristics;
     }
-  pe_close (pep);
   return 0;
 }
 
 int
-set_coff_characteristics(const char *pathname,
+set_coff_characteristics(const pe_file *pep,
                          WORD coff_characteristics)
 {
-  pe_file *pep = pe_open (pathname, TRUE);
-  if (!pep)
-    return 1;
   if (pep->is_64bit)
     pep->ntheader64->FileHeader.Characteristics = coff_characteristics;
   else
     pep->ntheader32->FileHeader.Characteristics = coff_characteristics;
-  pe_close (pep);
   return 0;
 }
 
 int
-set_pe_characteristics(const char *pathname,
+set_pe_characteristics(const pe_file *pep,
                        WORD pe_characteristics)
 {
-  pe_file *pep = pe_open (pathname, TRUE);
-  if (!pep)
-    return 1;
   if (pep->is_64bit)
     pep->ntheader64->OptionalHeader.DllCharacteristics = pe_characteristics;
   else
     pep->ntheader32->OptionalHeader.DllCharacteristics = pe_characteristics;
-  pe_close (pep);
   return 0;
 }
 

@@ -1,3 +1,15 @@
+2011-08-07  Corinna Vinschen  <corinna@vinschen.de>
+
+	* peflags.c (pe_file): Move definition to start of file.
+	(pe_open): Declare.
+	(pe_close): Declare.
+	(do_mark): Call pe_open/pe_close here.  Call get/set functions
+	weith pe_file pointer instead of filename.
+	(get_characteristics): Change first parameter to pe_file pointer.
+	Drop calls to pe_open/pe_close.
+	(set_coff_characteristics): Ditto.
+	(set_pe_characteristics): Ditto.
+
 2011-08-05  Corinna Vinschen  <corinna@vinschen.de>
 
 	* peflags.c: Include sys/mman.h on Cygwin and msys.  Drop conditional
