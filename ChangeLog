@@ -1,5 +1,11 @@
 2011-08-07  Corinna Vinschen  <corinna@vinschen.de>
 
+	* peflags.c (do_mark): Don't check return value of get_characteristics,
+	set_coff_characteristics and set_pe_characteristics since they always
+	succeed now.
+
+2011-08-07  Corinna Vinschen  <corinna@vinschen.de>
+
 	* peflags.c (pe_file): Move definition to start of file.
 	(pe_open): Declare.
 	(pe_close): Declare.

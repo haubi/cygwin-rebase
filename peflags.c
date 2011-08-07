@@ -240,7 +240,6 @@ do_mark (const char *pathname)
   int has_relocs;
   int is_executable;
   int is_dll;
-  int ret = 0;
   WORD old_coff_characteristics;
   WORD new_coff_characteristics;
   WORD old_pe_characteristics;
@@ -272,15 +271,10 @@ do_mark (const char *pathname)
       return 0;
     }
 
-  if (get_characteristics (pep,
-                           &old_coff_characteristics,
-                           &old_pe_characteristics) != 0)
-    {
-      fprintf (stderr,
-               "%s: skipped because could not read file characteristics\n",
-               pathname);
-      goto out;
-    }
+  get_characteristics (pep,
+		       &old_coff_characteristics,
+		       &old_pe_characteristics);
+
   new_coff_characteristics = old_coff_characteristics;
   new_coff_characteristics |= coff_characteristics_set;
   new_coff_characteristics &= ~coff_characteristics_clr;
@@ -346,23 +340,9 @@ do_mark (const char *pathname)
 
       /* setting */
       if (new_coff_characteristics != old_coff_characteristics)
-        if (set_coff_characteristics (pep, new_coff_characteristics) != 0)
-          {
-            fprintf (stderr,
-                     "Error: could not update coff characteristics (%s): %s\n",
-                      pathname, strerror (errno));
-            ret = 1;
-	    goto out;
-          }
+        set_coff_characteristics (pep, new_coff_characteristics);
       if (new_pe_characteristics != old_pe_characteristics)
-        if (set_pe_characteristics (pep, new_pe_characteristics) != 0)
-          {
-            fprintf (stderr,
-                     "Error: could not update pe characteristics (%s): %s\n",
-                      pathname, strerror (errno));
-            ret = 1;
-	    goto out;
-          }
+        set_pe_characteristics (pep, new_pe_characteristics);
     }
 
   /* Display characteristics. */
@@ -385,9 +365,9 @@ do_mark (const char *pathname)
       puts ("");
     }
 
-out:
   pe_close (pep);
-  return ret;
+
+  return 0;
 }
 
 static void
