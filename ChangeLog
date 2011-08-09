@@ -1,3 +1,7 @@
+2011-08-09  Corinna Vinschen  <corinna@vinschen.de>
+
+	* rebase.c (main): Skip empty arguments.
+
 2011-08-07  Corinna Vinschen  <corinna@vinschen.de>
 
 	* peflags.c (do_mark): Don't check return value of get_characteristics,

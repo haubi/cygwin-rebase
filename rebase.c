@@ -183,9 +183,12 @@ main (int argc, char *argv[])
       status = TRUE;
       while (file_list_fgets (filename, MAX_PATH + 2, file))
 	{
-	  status = collect_image_info (filename);
-	  if (!status)
-	    break;
+	  if (strlen (filename) > 0)
+	    {
+	      status = collect_image_info (filename);
+	      if (!status)
+		break;
+	    }
 	}
 
       file_list_fclose (file);
@@ -197,9 +200,12 @@ main (int argc, char *argv[])
   for (i = args_index; i < argc; i++)
     {
       const char *filename = argv[i];
-      status = collect_image_info (filename);
-      if (!status)
-	return 2;
+      if (strlen (filename) > 0)
+	{
+	  status = collect_image_info (filename);
+	  if (!status)
+	    return 2;
+	}
     }
 
   /* Nothing to do? */
