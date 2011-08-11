@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <stdlib.h>
+#include <stddef.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -29,11 +30,24 @@
 #include <unistd.h>
 #include <getopt.h>
 #include <errno.h>
+#include <limits.h>
 #if defined (__CYGWIN__) || defined (__MSYS__)
 #include <sys/mman.h>
 #endif
+#if defined(__MSYS__)
+/* MSYS has no inttypes.h */
+# define PRIu64 "llu"
+# define PRIx64 "llx"
+#else
+# include <inttypes.h>
+#endif
 
 #include <windows.h>
+
+#if defined(__MSYS__)
+/* MSYS has no strtoull */
+unsigned long long strtoull(const char *, char **, int);
+#endif
 
 /* Fix broken definitions in older w32api. */
 #ifndef IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE
@@ -55,6 +69,7 @@ static WORD pe_characteristics_show;
 
 typedef struct
 {
+  const char *pathname;
   PIMAGE_DOS_HEADER dosheader;
   union
     {
@@ -111,6 +126,58 @@ static const symbolic_flags_t pe_symbolic_flags[] = {
   {0, 0, 0}
 };
 
+enum {
+  SIZEOF_STACK_RESERVE = 0,
+  SIZEOF_STACK_COMMIT,
+  SIZEOF_HEAP_RESERVE,
+  SIZEOF_HEAP_COMMIT,
+  SIZEOF_CYGWIN_HEAP,
+  NUM_SIZEOF_VALUES		/* Keep at the end */
+};
+
+typedef enum {
+  DONT_HANDLE = 0,
+  DO_READ = 1,
+  DO_WRITE = 2
+} do_handle_t;
+
+static do_handle_t handle_any_sizeof;
+
+typedef struct {
+  ULONGLONG  value;
+  const char *name;
+  const char *unit;
+  do_handle_t handle;
+  BOOL        is_ulong;		/* Only for 64 bit files. */
+  ULONG       offset64;
+  ULONG       offset32;
+} sizeof_values_t;
+
+sizeof_values_t sizeof_vals[5] = {
+  { 0, "stack reserve size"      , "bytes", 0, FALSE,
+    offsetof (IMAGE_NT_HEADERS64, OptionalHeader.SizeOfStackReserve),
+    offsetof (IMAGE_NT_HEADERS32, OptionalHeader.SizeOfStackReserve),
+  },
+  { 0, "stack commit size"       , "bytes", 0, FALSE,
+    offsetof (IMAGE_NT_HEADERS64, OptionalHeader.SizeOfStackCommit),
+    offsetof (IMAGE_NT_HEADERS32, OptionalHeader.SizeOfStackCommit),
+  },
+  { 0, "Win32 heap reserve size" , "bytes", 0, FALSE,
+    offsetof (IMAGE_NT_HEADERS64, OptionalHeader.SizeOfHeapReserve),
+    offsetof (IMAGE_NT_HEADERS32, OptionalHeader.SizeOfHeapReserve),
+  },
+  { 0, "Win32 heap commit size"  , "bytes", 0, FALSE,
+    offsetof (IMAGE_NT_HEADERS64, OptionalHeader.SizeOfHeapCommit),
+    offsetof (IMAGE_NT_HEADERS32, OptionalHeader.SizeOfHeapCommit),
+  },
+  { 0, "initial Cygwin heap size", "MB", 0, TRUE,
+    offsetof (IMAGE_NT_HEADERS64, OptionalHeader.LoaderFlags),
+    offsetof (IMAGE_NT_HEADERS32, OptionalHeader.LoaderFlags),
+  }
+};
+
+#define pulonglong(struct, offset)	(PULONGLONG)((PBYTE)(struct)+(offset))
+#define pulong(struct, offset)		(PULONG)((PBYTE)(struct)+(offset))
 
 static struct option long_options[] = {
   {"dynamicbase",  optional_argument, NULL, 'd'},
@@ -124,13 +191,19 @@ static struct option long_options[] = {
   {"wstrim",       optional_argument, NULL, 'w'},
   {"bigaddr",      optional_argument, NULL, 'l'},
   {"sepdbg",       optional_argument, NULL, 'S'},
+  {"stack-reserve",optional_argument, NULL, 'x'},
+  {"stack-commit", optional_argument, NULL, 'X'},
+  {"heap-reserve", optional_argument, NULL, 'y'},
+  {"heap-commit",  optional_argument, NULL, 'Y'},
+  {"cygwin-heap",  optional_argument, NULL, 'z'},
   {"filelist",     no_argument, NULL, 'T'},
   {"verbose",      no_argument, NULL, 'v'},
   {"help",         no_argument, NULL, 'h'},
   {"version",      no_argument, NULL, 'V'},
   {NULL, no_argument, NULL, 0}
 };
-static const char *short_options = "d::f::n::i::s::b::W::t::w::l::S::T:vhV";
+static const char *short_options
+	= "d::f::n::i::s::b::W::t::w::l::S::x::X::y::Y::z::T:vhV";
 
 static void short_usage (FILE *f);
 static void help (FILE *f);
@@ -139,6 +212,7 @@ static void version (FILE *f);
 int do_mark (const char *pathname);
 pe_file *pe_open (const char *path, BOOL writing);
 void pe_close (pe_file *pep);
+void get_and_set_sizes(const pe_file *pep);
 int get_characteristics(const pe_file *pep,
                         WORD* coff_characteristics,
                         WORD* pe_characteristics);
@@ -160,9 +234,12 @@ static void handle_coff_flag_option (const char *option_name,
 static void handle_pe_flag_option (const char *option_name,
                                    const char *option_arg,
                                    WORD   flag_value);
+static void handle_num_option (const char *option_name,
+			       const char *option_arg,
+			       int option_index);
 void parse_args (int argc, char *argv[]);
 int string_to_bool  (const char *string, int *value);
-int string_to_ulong (const char *string, unsigned long *value);
+int string_to_ulonglong (const char *string, unsigned long long *value);
 FILE *file_list_fopen (const char *file_list);
 char *file_list_fgets (char *buf, int size, FILE *file);
 int file_list_fclose (FILE *file);
@@ -262,7 +339,8 @@ do_mark (const char *pathname)
         }
     }
 
-  pe_file *pep = pe_open (pathname, mark_any != 0);
+  pe_file *pep = pe_open (pathname, mark_any != 0
+				    || handle_any_sizeof == DO_WRITE);
   if (!pep)
     {
       fprintf (stderr,
@@ -274,6 +352,7 @@ do_mark (const char *pathname)
   get_characteristics (pep,
 		       &old_coff_characteristics,
 		       &old_pe_characteristics);
+  get_and_set_sizes (pep);
 
   new_coff_characteristics = old_coff_characteristics;
   new_coff_characteristics |= coff_characteristics_set;
@@ -349,20 +428,45 @@ do_mark (const char *pathname)
   if (verbose
       || !mark_any
       || coff_characteristics_show
-      || pe_characteristics_show)
+      || pe_characteristics_show
+      || handle_any_sizeof != DONT_HANDLE)
     {
+      BOOL printed_characteristic = FALSE;
+      int i;
+
       printf ("%s: ", pathname);
-      display_flags ("coff", coff_symbolic_flags,
-                     coff_characteristics_show ?:
-                     verbose ? old_coff_characteristics : 0,
-                     old_coff_characteristics,
-                     new_coff_characteristics);
-      display_flags ("pe", pe_symbolic_flags,
-                     pe_characteristics_show ?:
-                     verbose ? old_pe_characteristics : 0,
-                     old_pe_characteristics,
-                     new_pe_characteristics);
-      puts ("");
+      if (verbose
+	  || (!mark_any && handle_any_sizeof == DONT_HANDLE)
+	  || coff_characteristics_show || pe_characteristics_show)
+	{
+	  display_flags ("coff", coff_symbolic_flags,
+			 coff_characteristics_show ?:
+			 verbose ? old_coff_characteristics : 0,
+			 old_coff_characteristics,
+			 new_coff_characteristics);
+	  display_flags ("pe", pe_symbolic_flags,
+			 pe_characteristics_show ?:
+			 verbose ? old_pe_characteristics : 0,
+			 old_pe_characteristics,
+			 new_pe_characteristics);
+	  puts ("");
+	  printed_characteristic = TRUE;
+	}
+
+      for (i = 0; i < NUM_SIZEOF_VALUES; ++i)
+	{
+	  if (sizeof_vals[i].handle != DONT_HANDLE)
+	    {
+	      printf ("%*s%-24s: %" PRIu64 " (0x%" PRIx64 ") %s\n",
+		      printed_characteristic ? (int) strlen (pathname) + 2
+					     : 0, "",
+		      sizeof_vals[i].name,
+		      sizeof_vals[i].value,
+		      sizeof_vals[i].value,
+		      sizeof_vals[i].unit);
+	      printed_characteristic = TRUE;
+	    }
+	}
     }
 
   pe_close (pep);
@@ -475,6 +579,37 @@ xmalloc (size_t num)
 }
 
 static void
+handle_num_option (const char *option_name,
+		   const char *option_arg,
+		   int option_index)
+{
+  if (!option_arg)
+    {
+      if (sizeof_vals[option_index].handle == DONT_HANDLE)
+	sizeof_vals[option_index].handle = DO_READ;
+      if (handle_any_sizeof == DONT_HANDLE)
+	handle_any_sizeof = DO_READ;
+    }
+  else if (string_to_ulonglong (option_arg, &sizeof_vals[option_index].value)
+	   /* 48 bit address space */
+	   || sizeof_vals[option_index].value > 0x0000ffffffffffffULL
+	   /* Just a ULONG value */
+	   || (sizeof_vals[option_index].is_ulong
+	       && sizeof_vals[option_index].value > ULONG_MAX))
+    {
+      fprintf (stderr, "Invalid argument for %s: %s\n", 
+	       option_name, option_arg);
+      short_usage (stderr);
+      exit (1);
+    }
+  else
+    {
+      sizeof_vals[option_index].handle = DO_WRITE;
+      handle_any_sizeof = DO_WRITE;
+    }
+}
+
+static void
 handle_pe_flag_option (const char *option_name,
                        const char *option_arg,
                        WORD   flag_value)
@@ -537,6 +672,16 @@ parse_args (int argc, char *argv[])
       c = getopt_long (argc, argv, short_options, long_options, &option_index);
       if (c == -1)
         break;
+      /* Workaround the problem that option_index is not valid if the user
+	 specified a short option. */
+      if (option_index == 0 && c != long_options[0].val)
+	{
+	  for (option_index = 1;
+	       long_options[option_index].name;
+	       ++option_index)
+	    if (long_options[option_index].val == c)
+	      break;
+	}
 
       switch (c)
 	{
@@ -604,6 +749,31 @@ parse_args (int argc, char *argv[])
 	                           optarg,
 	                           IMAGE_FILE_DEBUG_STRIPPED);
 	  break;
+	case 'x':
+	  handle_num_option (long_options[option_index].name,
+			     optarg,
+			     SIZEOF_STACK_RESERVE);
+	  break;
+	case 'X':
+	  handle_num_option (long_options[option_index].name,
+			     optarg,
+			     SIZEOF_STACK_COMMIT);
+	  break;
+	case 'y':
+	  handle_num_option (long_options[option_index].name,
+			     optarg,
+			     SIZEOF_HEAP_RESERVE);
+	  break;
+	case 'Y':
+	  handle_num_option (long_options[option_index].name,
+			     optarg,
+			     SIZEOF_HEAP_COMMIT);
+	  break;
+	case 'z':
+	  handle_num_option (long_options[option_index].name,
+			     optarg,
+			     SIZEOF_CYGWIN_HEAP);
+	  break;
 	case 'T':
 	  file_list = optarg;
 	  break;
@@ -629,11 +799,11 @@ parse_args (int argc, char *argv[])
 int
 string_to_bool (const char *string, int *value)
 {
-  unsigned long number = 0;
+  unsigned long long number = 0;
   if (!string || !*string)
     return 1;
 
-  if (string_to_ulong (string, &number) != 0)
+  if (string_to_ulonglong (string, &number) != 0)
     {
       size_t len = strlen (string);
       if ( (len == 4 && strcasecmp (string, "true") == 0)
@@ -663,9 +833,9 @@ string_to_bool (const char *string, int *value)
 }
 
 int
-string_to_ulong (const char *string, unsigned long *value)
+string_to_ulonglong (const char *string, unsigned long long *value)
 {
-  unsigned long number = 0;
+  unsigned long long number = 0;
   char * endp;
   errno = 0;
 
@@ -673,7 +843,7 @@ string_to_ulong (const char *string, unsigned long *value)
   if (!string || !*string)
     return 1;
 
-  number = strtoul (string, &endp, 0);
+  number = strtoull (string, &endp, 0);
 
   /* out of range */
   if (ERANGE == errno)
@@ -738,6 +908,7 @@ pe_open (const char *path, BOOL writing)
       close (fd);
       return NULL;
     }
+  pef.pathname = path;
   pef.dosheader = (PIMAGE_DOS_HEADER) map;
   pef.ntheader32 = (PIMAGE_NT_HEADERS32)
 		   ((PBYTE) pef.dosheader + pef.dosheader->e_lfanew);
@@ -760,6 +931,44 @@ pe_close (pe_file *pep)
 {
   if (pep)
     munmap ((void *) pep->dosheader, 4096);
+}
+
+void
+get_and_set_size (const pe_file *pep, sizeof_values_t *val)
+{
+  if (val->handle == DO_READ)
+    {
+      if (!pep->is_64bit)
+	val->value = *pulong (pep->ntheader32, val->offset32);
+      else if (val->is_ulong)
+	val->value = *pulong (pep->ntheader64, val->offset64);
+      else
+	val->value = *pulonglong (pep->ntheader64, val->offset64);
+    }
+  else if (val->handle == DO_WRITE)
+    {
+      if ((!pep->is_64bit || val->is_ulong) && val->value >= ULONG_MAX)
+	{
+	  fprintf (stderr, "%s: Skip writing %s, value too big\n",
+		   pep->pathname, val->name);
+	  val->handle = DONT_HANDLE;
+	}
+      else if (!pep->is_64bit)
+	*pulong (pep->ntheader32, val->offset32) = val->value;
+      else if (val->is_ulong)
+	*pulong (pep->ntheader64, val->offset64) = val->value;
+      else
+	*pulonglong (pep->ntheader64, val->offset64) = val->value;
+    }
+}
+
+void
+get_and_set_sizes (const pe_file *pep)
+{
+  int i;
+
+  for (i = 0; i < NUM_SIZEOF_VALUES; ++i)
+    get_and_set_size (pep, sizeof_vals + i);
 }
 
 int
@@ -848,43 +1057,68 @@ short_usage (FILE *f)
 static void
 help (FILE *f)
 {
-  fputs ("Usage: peflags [OPTIONS] file(s)...\n", f);
-  fputs ("Sets, clears, or displays various flags in PE files (that is,\n", f);
-  fputs ("exes and dlls).  For each flag, if an argument is given, then\n", f);
-  fputs ("the specified flag will be set or cleared; if no argument is\n", f);
-  fputs ("given, then the current value of that flag will be displayed.\n", f);
-  fputs ("\n", f);
-  fputs ("  -d, --dynamicbase  [BOOL]   Image base address may be relocated using\n", f);
-  fputs ("                              address space layout randomization (ASLR)\n", f);
-  fputs ("  -f, --forceinteg   [BOOL]   Code integrity checks are enforced\n", f);
-  fputs ("  -n, --nxcompat     [BOOL]   Image is compatible with data execution\n", f);
-  fputs ("                              prevention\n", f);
-  fputs ("  -i, --no-isolation [BOOL]   Image understands isolation but do not\n", f);
-  fputs ("                              isolate the image\n", f);
-  fputs ("  -s, --no-seh       [BOOL]   Image does not use SEH. No SE handler may\n", f);
-  fputs ("                              be called in this image\n", f);
-  fputs ("  -b, --no-bind      [BOOL]   Do not bind this image\n", f);
-  fputs ("  -W, --wdmdriver    [BOOL]   Driver uses the WDM model\n", f);
-  fputs ("  -t, --tsaware      [BOOL]   Image is Terminal Server aware\n", f);
-  fputs ("  -w, --wstrim       [BOOL]   Aggressively trim the working set.\n", f);
-  fputs ("  -l, --bigaddr      [BOOL]   The application can handle addresses\n", f);
-  fputs ("                              larger than 2 GB\n", f);
-  fputs ("  -S, --sepdbg       [BOOL]   Debugging information was removed and\n", f);
-  fputs ("                              stored separately in another file.\n", f);
-  fputs ("  -T, --filelist FILE         Indicate that FILE contains a list\n", f);
-  fputs ("                              of PE files to process\n", f);
-  fputs ("  -v, --verbose               Display diagnostic information\n", f);
-  fputs ("  -V, --version               Display version information\n", f);
-  fputs ("  -h, --help                  Display this help\n", f);
-  fputs ("\n", f);
-  fputs ("BOOL: may be 1, true, or yes - indicates that the flag should be set\n", f);
-  fputs ("          if 0, false, or no - indicates that the flag should be cleared\n", f);
-  fputs ("          if not present, then display symbolicly the value of the flag\n", f);
-  fputs ("Valid forms for short options: -d, -d0, -d1, -dfalse, etc\n", f);
-  fputs ("Valid forms for long options :  --tsaware, --tsaware=true, etc\n", f);
-  fputs ("To set a value, and display the results symbolic, repeat the option:\n", f);
-  fputs ("  --tsaware=true --tsaware -d0 -d\n", f);
-  fputs ("\n", f);
+  fputs (
+"Usage: peflags [OPTIONS] file(s)...\n"
+"Sets, clears, or displays various flags in PE files (that is, exes and dlls).\n"
+"Also sets or displays various numerical values which influence executable\n"
+"startup.  For each flag, if an argument is given, then the specified flag\n"
+"will be set or cleared; if no argument is given, then the current value of\n"
+"that flag will be displayed.  For each numerical value, if an argument is\n"
+"given, the specified value will be overwritten; if no argument is given, the\n"
+"numerical value will be displayed in decimal and hexadecimal notation.\n" 
+"\n"
+"  -d, --dynamicbase  [BOOL]   Image base address may be relocated using\n"
+"                              address space layout randomization (ASLR).\n"
+"  -f, --forceinteg   [BOOL]   Code integrity checks are enforced.\n"
+"  -n, --nxcompat     [BOOL]   Image is compatible with data execution\n"
+"                              prevention (DEP).\n"
+"  -i, --no-isolation [BOOL]   Image understands isolation but do not isolate\n"
+"                              the image.\n"
+"  -s, --no-seh       [BOOL]   Image does not use structured exception handling\n"
+"                              (SEH). No SE handler may be called in this image.\n"
+"  -b, --no-bind      [BOOL]   Do not bind this image.\n"
+"  -W, --wdmdriver    [BOOL]   Driver uses the WDM model.\n"
+"  -t, --tsaware      [BOOL]   Image is Terminal Server aware.\n"
+"  -w, --wstrim       [BOOL]   Aggressively trim the working set.\n"
+"  -l, --bigaddr      [BOOL]   The application can handle addresses larger\n"
+"                              than 2 GB.\n"
+"  -S, --sepdbg       [BOOL]   Debugging information was removed and stored\n"
+"                              separately in another file.\n"
+"  -x, --stack-reserve [NUM]   Reserved stack size of the process in bytes.\n"
+"  -X, --stack-commit  [NUM]   Initial commited portion of the process stack\n"
+"                              in bytes.\n"
+"  -y, --heap-reserve  [NUM]   Reserved heap size of the default application\n"
+"                              heap in bytes.  Note that this value has no\n"
+"                              significant meaning to Cygwin applications.\n"
+"                              See the -z, --cygwin-heap option instead.\n"
+"  -Y, --heap-commit   [NUM]   Initial commited portion of the default\n"
+"                              application heap in bytes.  Note that this value\n"
+"                              has no significant meaning to Cygwin applications.\n"
+"                              See the -z, --cygwin-heap option instead.\n"
+"  -z, --cygwin-heap   [NUM]   Initial reserved heap size of the Cygwin\n"
+"                              application heap in Megabytes.  This value is\n"
+"                              only evaluated starting with Cygwin 1.7.10.\n"
+"                              Useful values are between 4 and 2048.  If 0,\n"
+"                              Cygwin uses the default heap size of 384 Megs.\n"
+"                              Has no meaning for non-Cygwin applications.\n"
+"  -T, --filelist FILE         Indicate that FILE contains a list\n"
+"                              of PE files to process\n"
+"  -v, --verbose               Display diagnostic information\n"
+"  -V, --version               Display version information\n"
+"  -h, --help                  Display this help\n"
+"\n"
+"BOOL: may be 1, true, or yes - indicates that the flag should be set\n"
+"          if 0, false, or no - indicates that the flag should be cleared\n"
+"          if not present, then display symbolicly the value of the flag\n"
+"NUM : may be any 32 bit value for 32 bit executables, any 48 bit value for\n"
+"      64 bit executables.\n"
+"Valid forms for short options: -d, -d0, -d1, -dfalse, etc\n"
+"                               -z, -z0, -z1024, -z0x400, etc\n"
+"Valid forms for long options :  --tsaware, --tsaware=true, etc\n"
+"                                --cygwin-heap, --cygwin-heap=512, etc\n"
+"For flag values, to set a value, and display the results symbolic, repeat the\n"
+"option:  --tsaware=true --tsaware -d0 -d\n"
+"\n", f);
 }
 
 static void

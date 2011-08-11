@@ -1,3 +1,28 @@
+2011-08-11  Corinna Vinschen  <corinna@vinschen.de>
+
+	Implement new peflags arguments to change and display stack and
+	heap sizes.
+	* peflags.c: Include limits.h and stddef.h.
+	(PRIu64, PRIx64): Define for msys.  Otherwise include inttypes.h.
+	(pe_file): Add pathname member.
+	(handle_any_sizeof): New global variable.
+	(sizeof_values_t): New type.
+	(sizeof_vals): New global variable.
+	(long_options): Add stack-reserve, stack-commit, heap-reserve,
+	heap-commit, and cygwin-heap options.
+	(short_options): Add x, X, y, Y, and z options.
+	(do_mark): Handle changes and display of sizeof values.
+	(handle_num_option): New function.
+	(parse_args): Workaround the problem that option_index is not valid
+	if the user specified a short option.  Handle new options.
+	(string_to_bool): Call string_to_ulonglong.
+	(string_to_ulonglong): Replace string_to_ulong.
+	(pe_open): Add pathname to pef.
+	(get_and_set_size): New function.
+	(get_and_set_sizes): New function.
+	(help):  Use only one single fputs call for the entire text to
+	simplify formatting.  Add text to describe the new options.
+
 2011-08-09  Corinna Vinschen  <corinna@vinschen.de>
 
 	* rebase.c (main): Skip empty arguments.
