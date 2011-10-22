@@ -1,3 +1,11 @@
+2011-10-22  Jason Tishler  <jason@tishler.net>
+
+	Prepare for release 4.0.0.
+	* Makefile.in (SRC_DISTFILES): Remove aclocal.m4.  Add rebase-db.c,
+	rebase-db.h, rebase-dump.c, and strtoll.c.
+	* NEWS: Update documentation.
+	* configure.ac (AC_INIT): Update version to 4.0.0.
+
 2011-08-11  Corinna Vinschen  <corinna@vinschen.de>
 
 	Implement new peflags arguments to change and display stack and

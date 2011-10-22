@@ -1,12 +1,44 @@
 $Id$
 
-x.y.z
+4.0.0
 ==============================================================================
-    * rebase and peflags now support operations on 64bit objects
-    * New database functionality (see README)
-    * New developer application rebase-dump for displaying database contents
-    * New platform support: x86_64-w64-mingw32, i686-pc-msys
-    * Many algorithm improvements
+    * rebase and peflags now support operations on 64 bit objects.
+
+    * New rebase database functionality (see README).
+
+    * New developer application rebase-dump for displaying database contents.
+
+    * New platform support: x86_64-w64-mingw32, i686-pc-msys.
+
+    * peflags now supports short options for almost all flags.
+      peflags -v prints detailed information about the flags set in the
+      file header.
+
+    * rebase now supports long options including improved -h/--help
+      information.
+
+    * rebase -s/--database allows to keep a database of rebased DLLs.
+      This information is used in subsequent calls with the -s/--database
+      option to keep the entire list of DLLs in a good shape, address-wise.
+
+    * rebase -i/--info prints base address and size of DLLs given on
+      the command line, sorted by base address.  A trailing '*' in the
+      last column is printed if a DLL collides with another adjacent DLL
+      in the list.  rebase -i -s can be used to check if the DLLs in the
+      database are still in a good shape.
+
+    * On Cygwin, rebase actively avoids colliding with the Cygwin DLL
+      it is running under.
+
+    * rebaseall skips mingw directories automatically.
+
+    * rebaseall now uses the new rebase database facility.
+
+    * The imagehelper library has been much improved:
+      - Now supports reading and rebasing 64 bit binaries.
+      - New functions ReBaseImage64 and GetImageInfos64.
+      - Support long paths up to 32K characters.
+      - General API cleanup.
 
 3.0.2
 ==============================================================================

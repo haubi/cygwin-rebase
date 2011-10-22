@@ -83,11 +83,12 @@ REBASE_DUMP_LIBS =
 PEFLAGS_OBJS = peflags.$(O) $(LIBOBJS)
 PEFLAGS_LIBS =
 
-SRC_DISTFILES = aclocal.m4 configure.ac configure Makefile.in \
+SRC_DISTFILES = configure.ac configure Makefile.in \
 	peflagsall.in rebaseall.in peflags.c rebase.c \
 	build.sh ChangeLog COPYING NEWS README setup.hint Todo \
 	build-aux/config.guess build-aux/config.sub \
-	build-aux/install-sh getopt.h_ getopt_long.c
+	build-aux/install-sh getopt.h_ getopt_long.c \
+	rebase-db.c rebase-db.h rebase-dump.c strtoll.c
 
 all: libimagehelper rebase$(EXEEXT) rebase-dump$(EXEEXT) \
   peflags$(EXEEXT) rebaseall peflagsall
