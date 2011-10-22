@@ -1,3 +1,8 @@
+2011-10-22  Jason Tishler  <jason@tishler.net>
+
+	Prepare for release 4.0.0.
+	* Makefile.in (LIB_VERSION): Update to version 0.10.
+
 2011-08-03  Corinna Vinschen  <corinna@vinschen.de>
 
 	* objectfile.cc (ObjectFile::ObjectFile); Always open file with
