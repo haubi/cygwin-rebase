@@ -35,7 +35,7 @@ case `uname -s` in
 esac
 
 # configure
-${srcdir}/configure ${confargs} \
+${srcdir}/configure ${confargs} --sysconfdir=/etc \
 	CXXFLAGS="${CXXFLAGS}" CFLAGS="${CFLAGS}"
 
 # make

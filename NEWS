@@ -1,5 +1,11 @@
 $Id$
 
+4.0.1
+==============================================================================
+    * Change rebaseall to call rebase instead of ./rebase.
+
+    * Configure with --sysconfdir=/etc.
+
 4.0.0
 ==============================================================================
     * rebase and peflags now support operations on 64 bit objects.
