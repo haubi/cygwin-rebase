@@ -1,3 +1,7 @@
+2011-10-24  Corinna Vinschen  <corinna@vinschen.de>
+
+	* rebaseall.in: Call rebase, not ./rebase.
+
 2011-10-22  Jason Tishler  <jason@tishler.net>
 
 	Prepare for release 4.0.0.

@@ -214,9 +214,9 @@ fi
 
 if [ -z "${BaseAddress}" ]
 then
-  ./rebase "${Verbose}" -s "${Mach}" -T "${TmpFile}"
+  rebase "${Verbose}" -s "${Mach}" -T "${TmpFile}"
 else
-  ./rebase "${Verbose}" -s "${Mach}" -b "${BaseAddress}" -o "${Offset}" -T "${TmpFile}"
+  rebase "${Verbose}" -s "${Mach}" -b "${BaseAddress}" -o "${Offset}" -T "${TmpFile}"
 fi
 ExitCode=$?
 
