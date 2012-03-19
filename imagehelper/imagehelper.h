@@ -27,6 +27,10 @@
 extern "C" {
 #endif
 
+/* Set to TRUE if ReBaseImage{64} should also set the files last write
+   time to TimeStamp when the file has been successfully rebased. */
+extern BOOL ReBaseChangeFileTime;
+
 BOOL ReBaseImage64(
   LPCSTR CurrentImageName,
   LPCSTR SymbolPath,       // ignored

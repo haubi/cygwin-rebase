@@ -63,8 +63,10 @@ typedef struct _img_info
   ULONG   size;		/* Size of the DLL at rebased time.                  */
   ULONG   slot_size;	/* Size of the DLL rounded to allocation granularity.*/
   struct {		/* Flags                                             */
-    unsigned needs_rebasing : 1; /* Set to 0 in the database.  Used only     */
-				 /* while rebasing.                          */
+    ULONG needs_rebasing : 1; /* Set to 0 in the database.  Used only        */
+			      /* while rebasing.                             */
+    ULONG cannot_rebase  : 1; /* Set to 0 in the database.  Used only        */
+			      /* while rebasing.                             */
   } flag;
 } img_info_t;
 

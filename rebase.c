@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2001, 2002, 2003, 2004, 2008, 2011 Jason Tishler
+ * Copyright (c) 2001, 2002, 2003, 2004, 2008, 2011, 2012 Jason Tishler
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -232,6 +232,8 @@ main (int argc, char *argv[])
   else
     {
       /* Rebase with database support. */
+      BOOL header;
+
       merge_image_info ();
       status = TRUE;
       for (i = 0; i < img_info_size; ++i)
@@ -241,6 +243,28 @@ main (int argc, char *argv[])
 	    status = rebase (img_info_list[i].name, &new_image_base, FALSE);
 	    if (status)
 	      img_info_list[i].flag.needs_rebasing = 0;
+	  }
+      for (header = FALSE, i = 0; i < img_info_size; ++i)
+	if (img_info_list[i].flag.cannot_rebase)
+	  {
+	    if (!header)
+	      {
+		fputs ("\nThe following DLLs couldn't be rebased "
+		       "because they were in use:\n", stderr);
+		header = TRUE;
+	      }
+	    fprintf (stderr, "  %s\n", img_info_list[i].name);
+	  }
+      for (header = FALSE, i = 0; i < img_info_size; ++i)
+	if (img_info_list[i].flag.needs_rebasing)
+	  {
+	    if (!header)
+	      {
+		fputs ("\nThe following DLLs couldn't be rebased "
+		       "due to errors:\n", stderr);
+		header = TRUE;
+	      }
+	    fprintf (stderr, "  %s\n", img_info_list[i].name);
 	  }
       if (save_image_info () < 0)
 	return 2;
@@ -266,11 +290,14 @@ save_image_info ()
   int ret = 0;
   img_info_hdr_t hdr;
 
-  /* Remove all DLLs which couldn't be rebased from the list before storing
-     it in the database file. */
+  /* Drop cannot_rebase flag and remove all DLLs for which rebasing failed
+     from the list before storing it in the database file. */
   for (i = 0; i < img_info_size; ++i)
-    if (img_info_list[i].flag.needs_rebasing)
-      img_info_list[i--] = img_info_list[--img_info_size];
+    {
+      img_info_list[i].flag.cannot_rebase = 0;
+      if (img_info_list[i].flag.needs_rebasing)
+	img_info_list[i--] = img_info_list[--img_info_size];
+    }
   /* Create a temporary file to write to. */
   fd = mkstemp (tmp_file);
   if (fd < 0)
@@ -509,6 +536,17 @@ load_image_info ()
   return ret;
 }
 
+static BOOL
+set_cannot_rebase (img_info_t *img)
+{
+  int fd = open (img->name, O_WRONLY);
+  if (fd < 0)
+    img->flag.cannot_rebase = 1;
+  else
+    close (fd);
+  return img->flag.cannot_rebase;
+}
+
 int
 merge_image_info ()
 {
@@ -541,6 +579,9 @@ merge_image_info ()
     {
       for (i = img_info_rebase_start; i < img_info_size; ++i)
 	{
+	  /* First test if we can open the DLL for writing.  If not, it's
+	     probably blocked by another process. */
+	  set_cannot_rebase (&img_info_list[i]);
 	  match = bsearch (&img_info_list[i], img_info_list,
 			   img_info_rebase_start, sizeof (img_info_t),
 			   img_info_name_cmp);
@@ -551,8 +592,10 @@ merge_image_info ()
 		 of the old file.  If so, screw the new file into the old slot.
 		 Otherwise set base to 0 to indicate that this DLL needs a new
 		 base address. */
-	      if (match->base != img_info_list[i].base
-		  || match->slot_size < img_info_list[i].slot_size)
+	      if (img_info_list[i].flag.cannot_rebase)
+		match->base = img_info_list[i].base;
+	      else if (match->base != img_info_list[i].base
+		       || match->slot_size < img_info_list[i].slot_size)
 		{
 		  /* Reuse the old address if possible. */
 		  if (match->slot_size < img_info_list[i].slot_size)
@@ -566,23 +609,24 @@ merge_image_info ()
 	      free (img_info_list[i].name);
 	      img_info_list[i--] = img_info_list[--img_info_size];
 	    }
-	  else
+	  else if (!img_info_list[i].flag.cannot_rebase)
 	    /* Not in database yet.  Set base to 0 to choose a new one. */
 	    img_info_list[i].base = 0;
 	}
-      /* After eliminating the duplicates, check if the user requested
-	 a new base address on the command line.  If so, overwrite all
-	 base addresses with 0 and set img_info_rebase_start to 0, to
-	 skip any further test. */
-      if (force_rebase_flag)
-	img_info_rebase_start = 0;
     }
-  if (!img_info_rebase_start)
+  if (!img_info_rebase_start || force_rebase_flag)
     {
       /* No database yet or enforcing a new base address.  Set base of all
-	 DLLs to 0. */
+	 DLLs to 0, if possible. */
       for (i = 0; i < img_info_size; ++i)
-	img_info_list[i].base = 0;
+	{
+	  /* Test DLLs already in database for writability. */
+	  if (i < img_info_rebase_start)
+	    set_cannot_rebase (&img_info_list[i]);
+	  if (!img_info_list[i].flag.cannot_rebase)
+	    img_info_list[i].base = 0;
+	}
+      img_info_rebase_start = 0;
     }
 
   /* Now sort the old part of the list by base address. */
@@ -596,8 +640,10 @@ merge_image_info ()
       ULONG64 cur_base;
       ULONG cur_size, slot_size;
 
-      /* Files with the needs_rebasing flag set have been checked already. */
-      if (img_info_list[i].flag.needs_rebasing)
+      /* Files with the needs_rebasing or cannot_rebase flags set have been
+	 checked already. */
+      if (img_info_list[i].flag.needs_rebasing
+      	  || img_info_list[i].flag.cannot_rebase)
 	continue;
       /* Check if the files in the old list still exist.  Drop non-existant
 	 or unaccessible files. */
@@ -613,24 +659,34 @@ merge_image_info ()
 	  continue;
 	}
       slot_size = roundup2 (cur_size, ALLOCATION_SLOT);
-      /* If the file has been reinstalled, try to rebase to the same address
-	 in the first place. */
-      if (cur_base != img_info_list[i].base)
+      if (set_cannot_rebase (&img_info_list[i]))
+	img_info_list[i].base = cur_base;
+      else
 	{
-	  img_info_list[i].flag.needs_rebasing = 1;
-	  /* Set cur_base to the old base to simplify subsequent tests. */
-	  cur_base = img_info_list[i].base;
+	  /* If the file has been reinstalled, try to rebase to the same address
+	     in the first place. */
+	  if (cur_base != img_info_list[i].base)
+	    {
+	      img_info_list[i].flag.needs_rebasing = 1;
+	      /* Set cur_base to the old base to simplify subsequent tests. */
+	      cur_base = img_info_list[i].base;
+	    }
+	  /* However, if the DLL got bigger and doesn't fit into its slot
+	     anymore, rebase this DLL from scratch. */
+	  if (i + 1 < img_info_rebase_start
+	      && cur_base + slot_size + offset >= img_info_list[i + 1].base)
+	    img_info_list[i].base = 0;
+	  /* Does the previous DLL reach into the address space of this
+	     DLL?  This happens if the previous DLL is not rebaseable. */
+	  else if (i > 0 && cur_base < img_info_list[i - 1].base
+				       + img_info_list[i + 1].slot_size)
+	    img_info_list[i].base = 0;
+	  /* Does the file match the base address requirements?  If not,
+	     rebase from scratch. */
+	  else if ((down_flag && cur_base + slot_size + offset >= image_base)
+		   || (!down_flag && cur_base < image_base))
+	    img_info_list[i].base = 0;
 	}
-      /* However, if the DLL got bigger and doesn't fit into its slot
-	 anymore, rebase this DLL from scratch. */
-      if (i + 1 < img_info_rebase_start
-	  && cur_base + slot_size + offset >= img_info_list[i + 1].base)
-	img_info_list[i].base = 0;
-      /* Does the file match the base address requirements?  If not,
-	 rebase from scratch. */
-      else if ((down_flag && cur_base + slot_size + offset >= image_base)
-	       || (!down_flag && cur_base < image_base))
-	img_info_list[i].base = 0;
       /* Unconditionally overwrite old with new size. */
       img_info_list[i].size = cur_size;
       img_info_list[i].slot_size = slot_size;
@@ -1014,6 +1070,7 @@ static struct option long_options[] = {
   {"offset",	required_argument, NULL, 'o'},
   {"quiet",	no_argument,	   NULL, 'q'},
   {"database",	no_argument,	   NULL, 's'},
+  {"touch",	no_argument,	   NULL, 't'},
   {"filelist",	required_argument, NULL, 'T'},
   {"usage",	no_argument,	   NULL, 'h'},
   {"verbose",	no_argument,	   NULL, 'v'},
@@ -1021,7 +1078,7 @@ static struct option long_options[] = {
   {NULL,	no_argument,	   NULL,  0 }
 };
 
-static const char *short_options = "48b:dhio:qsT:vV";
+static const char *short_options = "48b:dhio:qstT:vV";
 
 void
 parse_args (int argc, char *argv[])
@@ -1062,6 +1119,9 @@ parse_args (int argc, char *argv[])
 	  image_storage_flag = TRUE;
 	  /* FIXME: For now enforce top-down rebasing when using the database.*/
 	  down_flag = TRUE;
+	  break;
+	case 't':
+	  ReBaseChangeFileTime = TRUE;
 	  break;
 	case 'T':
 	  file_list = optarg;
@@ -1220,6 +1280,9 @@ Rebase PE files, usually DLLs, to a specified address or address range.\n\
                           With the -s option, this option is implicitly set.\n\
   -o, --offset=OFFSET     Specify an additional offset between adjacent DLLs\n\
                           when rebasing.  Default is no offset.\n\
+  -t, --touch             Use this option to make sure the file's modification\n\
+                          time is bumped if it has been successfully rebased.\n\
+                          Usually rebase does not change the file's time.\n\
   -T, --filelist=FILE     Also rebase the files specified in FILE.  The format\n\
                           of FILE is one DLL per line.\n\
   -q, --quiet             Be quiet about non-critical issues.\n\

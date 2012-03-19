@@ -24,6 +24,8 @@
 #include "objectfile.h"
 #include "imagehelper.h"
 
+BOOL ReBaseChangeFileTime = FALSE;
+
 BOOL ReBaseImage64 (
   LPCSTR CurrentImageName,
   LPCSTR SymbolPath,       // ignored
@@ -121,6 +123,9 @@ BOOL ReBaseImage64 (
 
   if (!fGoingDown)
     *NewImageBase += *NewImageSize;
+
+  if (ReBaseChangeFileTime)
+    dll.setFileTime (TimeStamp);
 
   SetLastError(NO_ERROR);
   return true;

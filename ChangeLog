@@ -1,3 +1,25 @@
+2012-03-19  Corinna Vinschen  <corinna@vinschen.de>
+
+	* README: Document rebasell -p and -t options.  Document rebase -t
+	option.
+	* autorebase.bat: New file.
+	* autorebase.hint: New file.
+	* configure.ac: Bump package version to 4.1.0.
+	* rebase-db.h (struct _img_info): Add cannot_rebase flag.
+	* rebase.c (main): Print DLLs which couldn't be rebased to stderr.
+	(save_image_info): Set cannot_rebase flag to 0 before storing list
+	in DB.
+	(set_cannot_rebase): New function to test if a DLL is blocked by
+	another process.
+	(merge_image_info): Take DLLs blocked by other processes into account.
+	(long_options): Add --touch.
+	(short_options): Add -t.
+	(parse_args): Handle -t/--touch option. Set ReBaseChangeFileTime flag.
+	(usage): Add text for new -t/--touch option.
+	* rebaseall.in: Add -p and -t option.  Do option processing prior to
+	testing for running processes.  Only test for running processes if -p
+	option wasn't given.
+
 2011-10-24  Jason Tishler  <jason@tishler.net>
 
 	Prepare for release 4.0.1.

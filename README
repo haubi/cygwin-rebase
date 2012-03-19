@@ -167,16 +167,20 @@ rebaseall
 --------------------------------------------------------------------------------
 The following is the rebaseall command line syntax:
 
-    rebaseall [-b BaseAddress] [-o Offset] [-s DllSuffix] [-T FileList | -] [-4|-8] [-v]
+    rebaseall [-b BaseAddress] [-o Offset] [-s DllSuffix] [-T FileList | -] [-4|-8] [-p] [-t] [-v]
 
 where:
 
     -b => base address used by rebase (default: 0x70000000)
     -o => offset between each DLL rebased (default: 0x10000 MinGW/MSYS, 0x0 Cygwin)
+    -p => skip test for running ash or dash only.  This option is supposed to
+          be used by Cygwin's setup tool.  Only use it if you know what you're
+	  doing!
     -s => specify DLL suffix, use multiple if necessary (default: dll, so)
     -T => specify filelist (or stdin) to list additional files
     -4 => operate only on 32bit objects (ignore 64bit objects) (*)
     -8 => operate only on 64bit objects (ignore 32bit objects) (*)
+    -t => change modification timestamp of successfully rebased files
     -v => verbose (default: off)
 
 (*) -4 and -8 are mutually exclusive. -4 is the default if rebaseall is
@@ -242,6 +246,9 @@ The following is the rebase command line syntax:
                               With the -s option, this option is implicitly set.
       -o, --offset=OFFSET     Specify an additional offset between adjacent DLLs
                               when rebasing.  Default is no offset.
+      -t, --touch             Use this option to make sure the file's modification
+                              time is bumped if it has been successfully rebased.
+			      Usually rebase does not change the file's time.
       -T, --filelist=FILE     Also rebase the files specified in FILE.  The format
                               of FILE is one DLL per line.
       -q, --quiet             Be quiet about non-critical issues.

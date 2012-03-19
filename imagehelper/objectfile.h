@@ -75,6 +75,18 @@ class ObjectFile : public Base
       return sections;
     }
 
+    void setFileTime (ULONG seconds_since_epoche)
+    {
+      LARGE_INTEGER filetime;
+/* 100ns difference between Windows and UNIX timebase. */
+#define FACTOR (0x19db1ded53e8000LL)
+/* # of 100ns intervals per second. */
+#define NSPERSEC 10000000LL
+      filetime.QuadPart = seconds_since_epoche * NSPERSEC + FACTOR;
+      if (!SetFileTime (hfile, NULL, NULL, (FILETIME *) &filetime))
+        std::cerr << "SetFileTime: " << GetLastError () << std::endl;
+    }
+
     ~ObjectFile();
 
 

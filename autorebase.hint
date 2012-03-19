@@ -1,0 +1,6 @@
+sdesc: "Run rebaseall automatically"
+external-source: rebase
+category: _PostInstallLast
+requires: rebase dash
+autodep: .*/[^/]*\.(?:dll|so|oct)$
+incver_ifdep: yes
