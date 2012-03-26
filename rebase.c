@@ -1385,7 +1385,7 @@ version ()
 {
   fprintf (stderr, "rebase version %s (imagehelper version %s)\n",
 	   VERSION, LIB_VERSION);
-  fprintf (stderr, "Copyright (c) 2001, 2002, 2003, 2004, 2008, 2011 "
+  fprintf (stderr, "Copyright (c) 2001, 2002, 2003, 2004, 2008, 2011, 2012 "
 	   "Ralf Habacker, Jason Tishler, et al.\n");
 }
 

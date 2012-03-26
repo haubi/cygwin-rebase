@@ -1,6 +1,11 @@
 2012-03-26  Jason Tishler  <jason@tishler.net>
 
 	Prepare for release 4.1.0.
+	* rebase.c (version): Update copyright.
+
+2012-03-26  Jason Tishler  <jason@tishler.net>
+
+	Prepare for release 4.1.0.
 	* NEWS: Update documentation.
 
 2012-03-19  Corinna Vinschen  <corinna@vinschen.de>
