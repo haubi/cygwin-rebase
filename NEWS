@@ -1,5 +1,13 @@
 $Id$
 
+4.1.0
+==============================================================================
+    * Add rebase/rebaseall touch file (i.e., -t option) support.
+
+    * Add rebaseall setup (i.e., -p option) support.
+
+    * Add .oct to the default rebaseall suffix list.
+
 4.0.1
 ==============================================================================
     * Change rebaseall to call rebase instead of ./rebase.
