@@ -1,3 +1,7 @@
+2012-03-27  Corinna Vinschen  <corinna@vinschen.de>
+
+	* autorebase.hint: Disable "external-source".
+
 2012-03-26  Jason Tishler  <jason@tishler.net>
 
 	Prepare for release 4.1.0.
