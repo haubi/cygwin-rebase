@@ -2,4 +2,4 @@
 rem Postinstall scripts are always started from the Cygwin root dir
 rem so we can just call dash from here
 path .\bin;%path%
-dash -c "/bin/rebaseall -p"
+dash /bin/rebaseall -p
