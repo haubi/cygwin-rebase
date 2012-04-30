@@ -142,8 +142,8 @@ dlls on your entire system:
 Both procedures may be combined into a single, 4-step procedure if desired.
 
 Note that by default, peflagsall will set the tsaware flag on all executables
-(ash.exe and peflags.exe themselves excluded), and will set the dynamicbase
-flag on all 'dll' and 'so' files (cygwin1.dll and cyglsa64.dll excluded).
+(ash.exe and peflags.exe themselves excluded), and will remove the dynamicbase
+flag on all 'dll', 'so' and 'oct' files (cygwin1.dll and cyglsa64.dll excluded).
 
 If you are used to using the -s option with rebaseall, to add additional
 suffixes to the rebase list (such as .oct), be warned that peflags behaves
@@ -176,7 +176,7 @@ where:
     -p => skip test for running ash or dash only.  This option is supposed to
           be used by Cygwin's setup tool.  Only use it if you know what you're
 	  doing!
-    -s => specify DLL suffix, use multiple if necessary (default: dll, so)
+    -s => specify DLL suffix, use multiple if necessary (default: dll, so, oct)
     -T => specify filelist (or stdin) to list additional files
     -4 => operate only on 32bit objects (ignore 64bit objects) (*)
     -8 => operate only on 64bit objects (ignore 32bit objects) (*)
@@ -197,15 +197,15 @@ The following is the peflagsall command line syntax:
 
     peflagsall [-p extra_args] [-d bool] [-t bool] [-s suffix] [-T FileList | -] [-vnh]
 
-    When invoked with no arguments, peflagsall modifies every cygwin exe|dll|so
-    on the system: .exe files have their tsaware flag set, while .dll and .so files
-    have their dynamicbase flag set. However, if any of [-d|-t|-s] are specified
-    then ONLY the actions so specified will occur.
+    When invoked with no arguments, peflagsall modifies every cygwin exe|dll|so|oct
+    on the system: .exe files have their tsaware flag set, while .dll, .so and .oct
+    files have their dynamicbase flag removed. However, if any of [-d|-t|-s] are
+    specified then ONLY the actions so specified will occur.
        -p extra_args   pass extra_args to peflags.exe
        -d bool         set the dynamicbase flag to 'bool' on all specified files
        -t bool         set the tsaware flag to 'bool' on all specified files
        -s suffix       search for all files with the specified suffix(es)
-                         default: 'exe|dll|so'
+                         default: 'exe|dll|so|oct'
        -T FileList     in addition to files located via the normal search and
                        suffix list, also operate on files listed in FileList
                        May be '-' which indicates stdin
@@ -244,6 +244,7 @@ The following is the rebase command line syntax:
                               files top-down from there.  Without this option the
                               files are rebased from BaseAddress bottom-up.
                               With the -s option, this option is implicitly set.
+      -n, --no-dynamicbase    Remove PE dynamicbase flag from rebased DLLs, if set.
       -o, --offset=OFFSET     Specify an additional offset between adjacent DLLs
                               when rebasing.  Default is no offset.
       -t, --touch             Use this option to make sure the file's modification

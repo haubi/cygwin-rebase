@@ -1072,13 +1072,13 @@ static struct option long_options[] = {
   {"database",	no_argument,	   NULL, 's'},
   {"touch",	no_argument,	   NULL, 't'},
   {"filelist",	required_argument, NULL, 'T'},
-  {"usage",	no_argument,	   NULL, 'h'},
+  {"no-dynamicbase", no_argument,  NULL, 'n'},
   {"verbose",	no_argument,	   NULL, 'v'},
   {"version",	no_argument,	   NULL, 'V'},
   {NULL,	no_argument,	   NULL,  0 }
 };
 
-static const char *short_options = "48b:dhio:qstT:vV";
+static const char *short_options = "48b:dhino:qstT:vV";
 
 void
 parse_args (int argc, char *argv[])
@@ -1125,6 +1125,9 @@ parse_args (int argc, char *argv[])
 	  break;
 	case 'T':
 	  file_list = optarg;
+	  break;
+	case 'n':
+	  ReBaseDropDynamicbaseFlag = TRUE;
 	  break;
 	case 'v':
 	  verbose = TRUE;
@@ -1278,6 +1281,7 @@ Rebase PE files, usually DLLs, to a specified address or address range.\n\
                           files top-down from there.  Without this option the\n\
                           files are rebased from BaseAddress bottom-up.\n\
                           With the -s option, this option is implicitly set.\n\
+  -n, --no-dynamicbase    Remove PE dynamicbase flag from rebased DLLs, if set.\n\
   -o, --offset=OFFSET     Specify an additional offset between adjacent DLLs\n\
                           when rebasing.  Default is no offset.\n\
   -t, --touch             Use this option to make sure the file's modification\n\

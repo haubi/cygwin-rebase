@@ -1,3 +1,17 @@
+2012-04-30  Corinna Vinschen  <corinna@vinschen.de>
+
+	* configure.ac (AC_INIT): Bump version to 4.2.0.
+	* peflagsall.in: Set DefaultDynBase to 0 to remove the dynamicbase
+	flag by default, rather than to set it.  Add .oct to DefaultSuffixes,
+	just as in rebaseall.in.  Fix help text accordingly.
+	* rebase.c (long_options): Add --no-dynamicbase.
+	(short_options): Add -n.
+	(parse_args): Handle -n/--no-dynamicbase option.  Set
+	ReBaseDropDynamicbaseFlag flag.
+	(usage): Add text for new -n/--no-dynamicbase option.
+	* rebaseall.in: Call rebase with -n flag on Cygwin.
+	* README: Document all aforementioned changes.
+
 2012-03-27  Corinna Vinschen  <corinna@vinschen.de>
 
 	* autorebase.bat: Just call rebaseall as script.

@@ -28,12 +28,12 @@ ProgramName=${0##*/}
 ProgramOptions='p:d:t:s:T:knvh'
 DefaultExtraArgs=
 DefaultTSAware=1
-DefaultDynBase=1
+DefaultDynBase=0
 DefaultKeep=
 DefaultDoNothing=
 DefaultVerbose=
 DefaultFileList=
-DefaultSuffixes='exe|dll|so'
+DefaultSuffixes='exe|dll|so|oct'
 
 # Define functions
 usage_string="usage: $ProgramName [-p extra_args] [-d bool] [-t bool] [-s suffix] [-T FileList | -] [-vnh]"
@@ -47,14 +47,14 @@ long_help ()
 {
     echo "$usage_string"
     echo "When invoked with no arguments, $ProgramName modifies every cygwin $DefaultSuffixes"
-    echo "on the system: .exe files have their tsaware flag set, while .dll and .so files"
-    echo "have their dynamicbase flag set. However, if any of [-d|-t|-s] are specified"
-    echo "then ONLY the actions so specified will occur."
+    echo "on the system: .exe files have their tsaware flag set, while .dll, .so and .oct"
+    echo "files have their dynamicbase flag removed. However, if any of [-d|-t|-s] are"
+    echo "specified then ONLY the actions so specified will occur."
     echo "   -p extra_args   pass extra_args to peflags.exe"  
     echo "   -d bool         set the dynamicbase flag to 'bool' on all specified files"
     echo "   -t bool         set the tsaware flag to 'bool' on all specified files"
     echo "   -s suffix       search for all files with the specified suffix(es)"
-    echo "                     default: 'exe|dll|so'"
+    echo "                     default: 'exe|dll|so|oct'"
     echo "   -T FileList     in addition to files located via the normal search and"
     echo "                   suffix list, also operate on files listed in FileList"
     echo "                   May be '-' which indicates stdin"

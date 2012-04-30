@@ -1,3 +1,11 @@
+2012-04-30  Corinna Vinschen  <corinna@vinschen.de>
+
+	* imagehelper.h (ReBaseDropDynamicbaseFlag): Declare.
+	* rebaseimage.cc: Include windows.h.  Handle old w32api releases.
+	(ReBaseDropDynamicbaseFlag): Define.
+	(ReBaseImage64): Drop IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE flag
+	in DllCharacteristics if successfully rebased and
+
 2012-03-19  Corinna Vinschen  <corinna@vinschen.de>
 
 	* imagehelper.h (ReBaseChangeFileTime): Declare.

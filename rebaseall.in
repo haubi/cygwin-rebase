@@ -33,6 +33,7 @@ ProgramOptions='48b:o:ps:tT:v'
 DefaultBaseAddress=0x70000000
 DefaultOffset=@DEFAULT_OFFSET_VALUE@
 DefaultTouch=
+DefaultNoDyn=
 DefaultVerbose=
 DefaultFileList=
 DefaultSuffixes='dll|so|oct'
@@ -57,6 +58,7 @@ trap cleanup 1 2 15
 BaseAddress=""
 Offset="${DefaultOffset}"
 Touch="${DefaultTouch}"
+NoDyn="${DefaultNoDyn}"
 Verbose="${DefaultVerbose}"
 FileList="${DefaultFileList}"
 Suffixes="${DefaultSuffixes}"
@@ -203,6 +205,9 @@ case $Platform in
       sed -e '/cygwin1\.dll$/d' -e '/cyglsa.*\.dll$/d' \
           -e '/sys-root\/mingw/d' -e 's/^/\//' \
           -e '/d?ash\.exe$/d' -e '/rebase\.exe$/d' >"${TmpFile}"
+      # Unconditionally add the -n flag so rebased DLLs get the
+      # dynamicbase flag removed.
+      NoDyn='-n'
     ;;
   mingw|msys)
     for f in /bin /lib
@@ -224,9 +229,9 @@ fi
 
 if [ -z "${BaseAddress}" ]
 then
-  rebase "${Verbose}" "${Touch}" -s "${Mach}" -T "${TmpFile}"
+  rebase "${Verbose}" "${Touch}" "${NoDyn}" -s "${Mach}" -T "${TmpFile}"
 else
-  rebase "${Verbose}" "${Touch}" -s "${Mach}" -b "${BaseAddress}" -o "${Offset}" -T "${TmpFile}"
+  rebase "${Verbose}" "${Touch}" "${NoDyn}" -s "${Mach}" -b "${BaseAddress}" -o "${Offset}" -T "${TmpFile}"
 fi
 ExitCode=$?
 

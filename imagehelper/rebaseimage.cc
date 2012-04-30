@@ -21,10 +21,17 @@
 #include <iostream>
 #include <sstream>
 
+#include <windows.h>
+/* Take care of old w32api releases which screwed up the definition. */
+#ifndef IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE
+# define IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE 0x40
+#endif
+
 #include "objectfile.h"
 #include "imagehelper.h"
 
 BOOL ReBaseChangeFileTime = FALSE;
+BOOL ReBaseDropDynamicbaseFlag = FALSE;
 
 BOOL ReBaseImage64 (
   LPCSTR CurrentImageName,
@@ -121,11 +128,21 @@ BOOL ReBaseImage64 (
       return false;
     }
 
-  if (!fGoingDown)
-    *NewImageBase += *NewImageSize;
-
   if (ReBaseChangeFileTime)
     dll.setFileTime (TimeStamp);
+
+  if (ReBaseDropDynamicbaseFlag)
+    {
+      if (dll.is64bit ())
+	ntheader64->OptionalHeader.DllCharacteristics
+	  &= ~IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE;
+      else
+	ntheader32->OptionalHeader.DllCharacteristics
+	  &= ~IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE;
+    }
+
+  if (!fGoingDown)
+    *NewImageBase += *NewImageSize;
 
   SetLastError(NO_ERROR);
   return true;

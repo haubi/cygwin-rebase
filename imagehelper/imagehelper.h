@@ -30,6 +30,9 @@ extern "C" {
 /* Set to TRUE if ReBaseImage{64} should also set the files last write
    time to TimeStamp when the file has been successfully rebased. */
 extern BOOL ReBaseChangeFileTime;
+/* Set to TRUE, if rebasing should also drop the /DYNAMICBASE flag
+   from the PE flags. */
+extern BOOL ReBaseDropDynamicbaseFlag;
 
 BOOL ReBaseImage64(
   LPCSTR CurrentImageName,
