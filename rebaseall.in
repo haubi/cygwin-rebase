@@ -202,9 +202,9 @@ case $Platform in
   cygwin)
     find /etc/setup -name '*.lst.gz' | xargs gzip -d -c |
       grep -E "\.($Suffixes)\$" |
-      sed -e '/cygwin1\.dll$/d' -e '/cyglsa.*\.dll$/d' \
+      sed -e '/\/cygwin1\.dll$/d' -e '/\/cyglsa.*\.dll$/d' \
           -e '/sys-root\/mingw/d' -e 's/^/\//' \
-          -e '/d?ash\.exe$/d' -e '/rebase\.exe$/d' >"${TmpFile}"
+          -e '/\/d\?ash\.exe$/d' -e '/\/rebase\.exe$/d' >"${TmpFile}"
       # Unconditionally add the -n flag so rebased DLLs get the
       # dynamicbase flag removed.
       NoDyn='-n'
@@ -214,9 +214,9 @@ case $Platform in
     do
       find $f -type f |
         grep -E "\.($Suffixes)\$" |
-	sed -e '/msys-1\.0.*\.dll$/d' -e '/cygwin1\.dll$/d' \
-	    -e '/cyglsa.*\.dll$/d' -e '/d?ash\.exe$/d' \
-	    -e '/rebase\.exe$/d' >>"$TmpFile"
+	sed -e '/\/msys-1\.0.*\.dll$/d' -e '/\/cygwin1\.dll$/d' \
+	    -e '/\/cyglsa.*\.dll$/d' -e '/\/d\?ash\.exe$/d' \
+	    -e '/\/rebase\.exe$/d' >>"$TmpFile"
     done
     ;;
 esac

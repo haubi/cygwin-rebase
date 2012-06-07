@@ -1,3 +1,8 @@
+2012-06-07  Achim Gratz   <stromeko@nexgo.de>
+
+	* rebaseall.in: Improve sed regular expressions used to generate the
+	rebase list.
+
 2012-04-30  Corinna Vinschen  <corinna@vinschen.de>
 
 	* configure.ac (AC_INIT): Bump version to 4.2.0.
