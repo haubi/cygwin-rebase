@@ -231,14 +231,17 @@ The following is the rebase command line syntax:
                               slots to rebase the files on the command line to.
                               (Implies -d).
                               If -b is given, too, the database gets recreated.
+      -O, --oblivious         Do not change any files already in the database
+                              and do not record any changes to the database.
+                              (Implies -s).
       -i, --info              Rather then rebasing, just print the current base
                               address and size of the files.  With -s, use the
                               database.  The files are ordered by base address.
                               A '*' at the end of the line is printed if a
                               collisions with an adjacent file is detected.
     
-      One of the options -b, -s or -i is mandatory.  If no rebase database exists
-      yet, -b is required together with -s.
+      One of the options -b, -s, -O or -i is mandatory.  If no rebase database
+      exists yet, -b is required together with -s.
     
       -d, --down              Treat the BaseAddress as upper ceiling and rebase
                               files top-down from there.  Without this option the

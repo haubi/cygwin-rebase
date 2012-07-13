@@ -1,3 +1,28 @@
+2012-06-14  Achim Gratz   <stromeko@nexgo.de>
+
+	Prepare for release 4.3.0.
+	* configure.ac (AC_INIT): Bump version to 4.3.0.
+	* rebase.c (short_options): Add -O option.
+	(long_options): Add --oblivious option.
+	(image_oblivious_flag): Add new BOOL flag, false by default, set
+	by -O.
+	(main): Only report non-rebaseable DLL if they should have been
+	rebased, i.e. cannot_rebase has the MSB cleared.
+	(parse_args): Handle -O/--oblivious, set image_oblivious_flag
+	accordingly.  Fall through to -s, since it is implied.
+	(usage): Add text for -O/--oblivious.
+	(load_image_info): Set MSB of cannot_rebase for all entries found
+	in database to ensure that they are not actually touched.
+	(merge_image_info): Warn if an oblivious file is found to be in
+	the database already.  The file will not be rebased to keep the
+	database in sync.
+	(save_image_info): Return immediately if image_oblivious_flag is
+	set.
+	* rebase.db.h (_img_info): Extend cannot_rebase flag to two bit.
+	If the MSB is set, the file is protected from rebasing due to
+	--oblivious currently in effect.
+	* rebase-dump.c (help): Fix typo -- escape missing in help text.
+
 2012-06-07  Achim Gratz   <stromeko@nexgo.de>
 
 	* rebaseall.in: Improve sed regular expressions used to generate the

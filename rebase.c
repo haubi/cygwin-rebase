@@ -70,6 +70,7 @@ ULONG64 image_base = 0;
 BOOL down_flag = FALSE;
 BOOL image_info_flag = FALSE;
 BOOL image_storage_flag = FALSE;
+BOOL image_oblivious_flag = FALSE;
 BOOL force_rebase_flag = FALSE;
 ULONG offset = 0;
 int args_index = 0;
@@ -245,7 +246,7 @@ main (int argc, char *argv[])
 	      img_info_list[i].flag.needs_rebasing = 0;
 	  }
       for (header = FALSE, i = 0; i < img_info_size; ++i)
-	if (img_info_list[i].flag.cannot_rebase)
+	if (img_info_list[i].flag.cannot_rebase == 1)
 	  {
 	    if (!header)
 	      {
@@ -290,6 +291,9 @@ save_image_info ()
   int ret = 0;
   img_info_hdr_t hdr;
 
+  /* Do not re-write the database if --oblivious is active */
+  if (image_oblivious_flag)
+    return 0;
   /* Drop cannot_rebase flag and remove all DLLs for which rebasing failed
      from the list before storing it in the database file. */
   for (i = 0; i < img_info_size; ++i)
@@ -492,7 +496,14 @@ load_image_info ()
   /* Make sure all pointers are NULL. */
   if (ret == 0)
     for (i = 0; i < img_info_size; ++i)
-      img_info_list[i].name = NULL;
+      {
+	img_info_list[i].name = NULL;
+	/* Ensure that existing database entries are not touched when
+	 *  --oblivious is active, even if they are out-of sync with
+	 *  reality. */
+	if (image_oblivious_flag)
+	  img_info_list[i].flag.cannot_rebase = 2;
+      }
   /* Eventually read the strings. */
   if (ret == 0)
     {
@@ -539,11 +550,16 @@ load_image_info ()
 static BOOL
 set_cannot_rebase (img_info_t *img)
 {
-  int fd = open (img->name, O_WRONLY);
-  if (fd < 0)
-    img->flag.cannot_rebase = 1;
-  else
-    close (fd);
+  /* While --oblivious is active, cannot_rebase is set to 2 on loading
+   * the database entries */
+  if (img->flag.cannot_rebase <= 1 )
+    {
+      int fd = open (img->name, O_WRONLY);
+      if (fd < 0)
+	img->flag.cannot_rebase = 1;
+      else
+	close (fd);
+    }
   return img->flag.cannot_rebase;
 }
 
@@ -605,6 +621,14 @@ merge_image_info ()
 	      /* Unconditionally overwrite old with new size. */
 	      match->size = img_info_list[i].size;
 	      match->slot_size = img_info_list[i].slot_size;
+	      /* With an --oblivious active, the files should not
+	       * already be in the database.  Warn since the file will
+	       * not be touched. */
+	      if (image_oblivious_flag)
+		fprintf (stderr, "%s: oblivious file \"%s\" already "
+			 "found in rebase database "
+			 "(file and database kept unchanged).\n",
+			 progname, img_info_list[i].name);
 	      /* Remove new entry from array. */
 	      free (img_info_list[i].name);
 	      img_info_list[i--] = img_info_list[--img_info_size];
@@ -1068,6 +1092,7 @@ static struct option long_options[] = {
   {"usage",	no_argument,	   NULL, 'h'},
   {"info",	no_argument,	   NULL, 'i'},
   {"offset",	required_argument, NULL, 'o'},
+  {"oblivious",	no_argument,	   NULL, 'O'},
   {"quiet",	no_argument,	   NULL, 'q'},
   {"database",	no_argument,	   NULL, 's'},
   {"touch",	no_argument,	   NULL, 't'},
@@ -1078,12 +1103,13 @@ static struct option long_options[] = {
   {NULL,	no_argument,	   NULL,  0 }
 };
 
-static const char *short_options = "48b:dhino:qstT:vV";
+static const char *short_options = "48b:dhino:OqstT:vV";
 
 void
 parse_args (int argc, char *argv[])
 {
   int opt = 0;
+  int count_file_list = 0;
 
   while ((opt = getopt_long (argc, argv, short_options, long_options, NULL))
 	 != -1)
@@ -1115,6 +1141,10 @@ parse_args (int argc, char *argv[])
 	case 'q':
 	  quiet = TRUE;
 	  break;
+	case 'O':
+	  image_oblivious_flag = TRUE;
+	  /* -O implies -s, which in turn implies -d, so intentionally
+	   * fall through to -s. */
 	case 's':
 	  image_storage_flag = TRUE;
 	  /* FIXME: For now enforce top-down rebasing when using the database.*/
@@ -1124,6 +1154,14 @@ parse_args (int argc, char *argv[])
 	  ReBaseChangeFileTime = TRUE;
 	  break;
 	case 'T':
+	  if (count_file_list++)
+	    {
+	      /* Currently only one file list allowed.  Would need an
+	       * array of file names and a loop around the file reader
+	       * for multiple occurences of this switch. */
+	      usage ();
+	      exit (1);
+	    }
 	  file_list = optarg;
 	  break;
 	case 'n':
@@ -1240,8 +1278,9 @@ void
 usage ()
 {
   fprintf (stderr,
-"usage: %s [-b BaseAddress] [-o Offset] [-48dsvV] [-T FileList | -] Files...\n"
-"       %s -i [-48s] [-T FileList | -] Files...\n"
+"usage: %s [-b BaseAddress] [-o Offset] [-48dOsvV]"
+" [-T [FileList | -]] Files...\n"
+"       %s -i [-48Os] [-T [FileList | -]] Files...\n"
 "       %s --help or --usage for full help text\n",
 	   progname, progname, progname);
 }
@@ -1268,6 +1307,9 @@ Rebase PE files, usually DLLs, to a specified address or address range.\n\
                           slots to rebase the files on the command line to.\n\
                           (Implies -d).\n\
                           If -b is given, too, the database gets recreated.\n\
+  -O, --oblivious         Do not change any files already in the database\n\
+                          and do not record any changes to the database.\n\
+                          (Implies -s).\n\
   -i, --info              Rather then rebasing, just print the current base\n\
                           address and size of the files.  With -s, use the\n\
                           database.  The files are ordered by base address.\n\

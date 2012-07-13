@@ -65,7 +65,7 @@ typedef struct _img_info
   struct {		/* Flags                                             */
     ULONG needs_rebasing : 1; /* Set to 0 in the database.  Used only        */
 			      /* while rebasing.                             */
-    ULONG cannot_rebase  : 1; /* Set to 0 in the database.  Used only        */
+    ULONG cannot_rebase  : 2; /* Set to 0 in the database.  Used only        */
 			      /* while rebasing.                             */
   } flag;
 } img_info_t;

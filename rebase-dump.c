@@ -309,7 +309,7 @@ void
 help ()
 {
   printf ("\
-Usage: %s [OPTIONS] [FILE]n\
+Usage: %s [OPTIONS] [FILE]\n\
 Dumps the rebase database file in readable format.\n\
   -q, --quiet             Be quiet about non-critical issues.\n\
   -v, --verbose           Print some debug output.\n\

@@ -1,5 +1,28 @@
 $Id$
 
+4.3.0
+==============================================================================
+    * Add --oblivious/-O option: do not touch files already in the
+      database nor the rebase database itself (operation with database
+      is implied), only process files given with -T or on the command
+      line.  This option can be used to rebase before testing in the
+      build directory without disturbing the installed packages on the
+      system.
+
+4.2.0
+==============================================================================
+    * Add --no-dynamicbase option to rebase.
+
+    * Change rebaseall to call rebase with the --no-dynamicbase option.
+
+    * Change rebaseall to use improved sed regular expressions to
+      generate the rebase file list.
+
+    * Change peflagsall to no longer default to enabling the --dynamicbase
+      option.
+
+    * Add .oct to the default peflagsall suffix list.
+
 4.1.0
 ==============================================================================
     * Add rebase/rebaseall touch file (i.e., -t option) support.
