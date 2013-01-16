@@ -210,7 +210,7 @@ class Relocations : SectionBase
     bool fix(void);
 
     // precondition: fixed dll
-    bool relocate(int difference);
+    bool relocate(int64_t difference);
 
   private:
     PIMAGE_BASE_RELOCATION relocs;

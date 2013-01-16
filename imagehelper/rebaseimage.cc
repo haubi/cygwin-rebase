@@ -118,7 +118,7 @@ BOOL ReBaseImage64 (
       ntheader32->FileHeader.TimeDateStamp = TimeStamp;
     }
 
-  int difference = *NewImageBase - *OldImageBase;
+  int64_t difference = *NewImageBase - *OldImageBase;
 
   if (!dll.performRelocation(difference))
     {

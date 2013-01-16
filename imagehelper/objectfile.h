@@ -125,7 +125,7 @@ class LinkedObjectFile : public ObjectFile
     {
       return relocs->fix();
     }
-    bool performRelocation(int difference)
+    bool performRelocation(int64_t difference)
     {
       return relocs->relocate(difference);
     }

@@ -302,14 +302,15 @@ bool Relocations::check(void)
       int NumOfRelocs = (relocp->SizeOfBlock - sizeof(IMAGE_BASE_RELOCATION)) / sizeof (WORD);
       int va = relocp->VirtualAddress;
       PWORD p = (PWORD)((uintptr_t)relocp + sizeof(IMAGE_BASE_RELOCATION));
-	    if (debug)
-	      	std::cerr << "debug: blocksize= " << std::dec << NumOfRelocs << std::endl;
+      if (debug)
+	  std::cerr << "debug: blocksize= " << std::dec << NumOfRelocs << std::endl;
 
       cursec = sections->find(va);
-	    if (debug) {
-	      	std::cerr << "debug: section= "; 
-	      	cursec->debugprint();
-      }
+      if (debug)
+        {
+	  std::cerr << "debug: section= "; 
+	  cursec->debugprint();
+	}
       if (!cursec)
         {
           if (debug)
@@ -319,11 +320,12 @@ bool Relocations::check(void)
           errors++;
           continue;
         }
-	    for (int i = 0; i < NumOfRelocs; i++,p++) {
-		    int location = (*p & 0x0fff) + va;
-	      if (debug)
-	      	std::cerr << "debug: location= 0x" << std::setw(8) << std::setfill('0') << std::hex << location << std::endl;
-		  }
+      if (debug)
+	for (int i = 0; i < NumOfRelocs; i++,p++)
+	  {
+	    int location = (*p & 0x0fff) + va;
+	    std::cerr << "debug: location= 0x" << std::setw(8) << std::setfill('0') << std::hex << location << std::endl;
+	  }
     }
   return errors == 0;
 }
@@ -365,7 +367,7 @@ bool Relocations::fix(void)
 }
 
 
-bool Relocations::relocate(int difference)
+bool Relocations::relocate(int64_t difference)
 {
   PIMAGE_BASE_RELOCATION relocp = relocs;
   int WholeNumOfRelocs = 0;
@@ -386,8 +388,6 @@ bool Relocations::relocate(int difference)
         }
       WholeNumOfRelocs += NumOfRelocs;
 
-      int adjust;
-
       Section *cursec = sections->find(va);
       if (!cursec)
         {
@@ -398,29 +398,54 @@ bool Relocations::relocate(int difference)
         	return false;
         }
       else if (debug)
-        // FIXME: this goes to cout but debug message should go to cerr
-        cursec->print("currently relocated section");
-      adjust = cursec->getAdjust();
+        cursec->debugprint("currently relocated section");
+
+      int adjust = cursec->getAdjust();
 
       for (int i = 0; i < NumOfRelocs; i++,p++)
         {
-          if ((*p & 0xf000) == 0x3000)
-            {
-              int location = (*p & 0x0fff) + va;
-              if (debug)
-                {
-                  std::cerr << "0x" \
-                  << std::setw(8) << std::setfill('0') << std::hex << location << std::dec \
-                  << " - ";
-                  std::cerr << "0x" \
-                  << std::setw(8) << std::setfill('0') << std::hex << location + adjust + 3 << std::dec \
-                  << std::endl;
-                }
-              int *patch_adr = (int *)cursec->rva2real(location);
-              *patch_adr += difference;
-            }
+	  WORD rel_type = (*p & 0xf000) >> 12;
+	  int location = (*p & 0x0fff) + va;
+
+	  switch (rel_type)
+	    {
+	    case IMAGE_REL_BASED_ABSOLUTE:
+	      break;
+	    case IMAGE_REL_BASED_HIGHLOW:
+	      {
+		if (debug)
+		  {
+		    std::cerr << "HIGHLOW: 0x" \
+		    << std::setw(8) << std::setfill('0') << std::hex << location << std::dec \
+		    << " - ";
+		    std::cerr << "0x" \
+		    << std::setw(8) << std::setfill('0') << std::hex << location + adjust + 3 << std::dec \
+		    << std::endl;
+		  }
+		int32_t *patch_adr = (int *)cursec->rva2real(location);
+		*patch_adr += difference;
+	      }
+	      break;
+	    case IMAGE_REL_BASED_DIR64:
+	      {
+		if (debug)
+		  {
+		    std::cerr << "  DIR64: 0x" \
+		    << std::setw(16) << std::setfill('0') << std::hex << location << std::dec \
+		    << " - ";
+		    std::cerr << "0x" \
+		    << std::setw(16) << std::setfill('0') << std::hex << location + adjust + 7 << std::dec \
+		    << std::endl;
+		  }
+		int64_t *patch_adr = (int64_t *)cursec->rva2real(location);
+		*patch_adr += difference;
+	      }
+	      break;
+	    default:
+	      std::cerr << "Unsupported relocation type " << rel_type << std::endl;
+	      break;
+	    }
         }
     }
-	return true;
+  return true;
 }
-

@@ -1,3 +1,18 @@
+2013-01-16  Corinna Vinschen  <corinna@vinschen.de>
+
+	* objectfile.h (LinkedObjectFile::performRelocation): Change type of
+	parameter to int64_t.
+	* rebaseimage.cc (ReBaseImage64): Change type of local variable
+	difference to int64_t.
+	* sections.cc (Relocations::check): Fix formatting.
+	(Relocations::relocate): Take difference parameter as int64_t.  Call
+	cursec->debugprint rather than cursec->print and drop FIXME comment.
+	Handle Windows relocation info types IMAGE_REL_BASED_ABSOLUTE,
+	IMAGE_REL_BASED_HIGHLOW and IMAGE_REL_BASED_DIR64.  Print error
+	output if another relocation type is found.  Fix formatting.
+	* sections.h (Relocations::relocate): Change type of parameter to
+	int64_t.
+
 2012-04-30  Corinna Vinschen  <corinna@vinschen.de>
 
 	* imagehelper.h (ReBaseDropDynamicbaseFlag): Declare.
