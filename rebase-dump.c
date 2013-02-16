@@ -125,7 +125,7 @@ load_image_info ()
     }
   if (verbose)
     printf ("== read %" PRIu64 " (0x%08" PRIx64 ") bytes (database header)\n",
-	    (unsigned long long) sizeof hdr, (unsigned long long) sizeof hdr);
+	    (uint64_t) sizeof hdr, (uint64_t) sizeof hdr);
 
   /* Check the header. */
   if (memcmp (hdr.magic, IMG_INFO_MAGIC, 4) != 0)
@@ -150,8 +150,8 @@ load_image_info ()
   if (hdr.version != IMG_INFO_VERSION)
     {
       fprintf (stderr, "%s: \"%s\" is a version %u rebase database.\n"
-		       "I can only handle versions up to %lu.\n",
-	       progname, db_file, hdr.version, IMG_INFO_VERSION);
+		       "I can only handle versions up to %u.\n",
+	       progname, db_file, hdr.version, (uint32_t) IMG_INFO_VERSION);
       close (fd);
       return -1;
     }
@@ -179,8 +179,8 @@ load_image_info ()
   if (ret == 0 && verbose)
     {
       printf ("== read %" PRIu64 " (0x%08" PRIx64 ") bytes (database w/o strings)\n",
-              (unsigned long long) img_info_size * sizeof (img_info_t),
-              (unsigned long long) img_info_size * sizeof (img_info_t));
+              (uint64_t) img_info_size * sizeof (img_info_t),
+              (uint64_t) img_info_size * sizeof (img_info_t));
     }
   /* Make sure all pointers are NULL (also dump db as read) */
   if (ret == 0)
@@ -192,13 +192,13 @@ load_image_info ()
         {
           img_info_list[i].name = NULL;
 	  if (verbose)
-            printf ("%03d: base 0x%0*" PRIx64 " size 0x%08lx slot 0x%08lx namesize %4ld %c\n",
+            printf ("%03d: base 0x%0*" PRIx64 " size 0x%08x slot 0x%08x namesize %4d %c\n",
 	            i,
 	            hdr.machine == IMAGE_FILE_MACHINE_I386 ? 8 : 12,
-	            img_info_list[i].base,
-	            img_info_list[i].size,
-	            img_info_list[i].slot_size,
-	            img_info_list[i].name_size,
+	            (uint64_t) img_info_list[i].base,
+	            (uint32_t) img_info_list[i].size,
+	            (uint32_t) img_info_list[i].slot_size,
+	            (uint32_t) img_info_list[i].name_size,
 	            img_info_list[i].flag.needs_rebasing ? '*' : ' ');
         }
     }
@@ -229,9 +229,9 @@ load_image_info ()
 	    }
 	  else if (verbose)
 	    {
-              printf ("%03d: namesize %4ld (0x%04lx) %s\n", i,
-		      img_info_list[i].name_size,
-		      img_info_list[i].name_size,
+              printf ("%03d: namesize %4d (0x%04x) %s\n", i,
+		      (uint32_t) img_info_list[i].name_size,
+		      (uint32_t) img_info_list[i].name_size,
 		      img_info_list[i].name);
 	    }
 	}

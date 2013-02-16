@@ -163,15 +163,23 @@ main (int argc, char *argv[])
 	 into the memory area taken by the Cygwin DLL. */
       GetImageInfos64 ("/bin/cygwin1.dll", NULL,
 		       &cygwin_dll_image_base, &cygwin_dll_image_size);
-      /* Take the three shared memory areas preceeding the DLL into account. */
-      cygwin_dll_image_base -= 3 * ALLOCATION_SLOT;
+      /* Take the up to four shared memory areas preceeding the DLL into
+      	 account. */
+      cygwin_dll_image_base -= 4 * ALLOCATION_SLOT;
       /* Add a slack of 8 * 64K at the end of the Cygwin DLL.  This leave a
 	 bit of room to install newer, bigger Cygwin DLLs, as well as room to
 	 install non-optimized DLLs for debugging purposes.  Otherwise the
 	 slightest change might break fork again :-P */
-      cygwin_dll_image_size += 3 * ALLOCATION_SLOT + 8 * ALLOCATION_SLOT;
+      cygwin_dll_image_size += 4 * ALLOCATION_SLOT + 8 * ALLOCATION_SLOT;
     }
-#endif
+  else
+    {
+      /* On x86_64 Cygwin, we want to keep free the whole 2 Gigs area in which
+	 the Cygwin DLL resides, no matter what. */
+      cygwin_dll_image_base = 0x180000000L;
+      cygwin_dll_image_size = 0x080000000L;
+    }
+#endif /* __CYGWIN__ */
 
   /* Collect file list, if specified. */
   if (file_list)
@@ -449,8 +457,8 @@ load_image_info ()
   if (hdr.version != IMG_INFO_VERSION)
     {
       fprintf (stderr, "%s: \"%s\" is a version %u rebase database.\n"
-		       "I can only handle versions up to %lu.\n",
-	       progname, db_file, hdr.version, IMG_INFO_VERSION);
+		       "I can only handle versions up to %u.\n",
+	       progname, db_file, hdr.version, (uint32_t) IMG_INFO_VERSION);
       close (fd);
       return -1;
     }
@@ -966,12 +974,12 @@ print_image_info ()
 	  img_info_list[i].flag.needs_rebasing = 1;
 	  img_info_list[tst].flag.needs_rebasing = 1;
 	}
-      printf ("%-*s base 0x%0*" PRIx64 " size 0x%08lx %c\n",
+      printf ("%-*s base 0x%0*" PRIx64 " size 0x%08x %c\n",
 	      name_width,
 	      img_info_list[i].name,
 	      machine == IMAGE_FILE_MACHINE_I386 ? 8 : 12,
-	      img_info_list[i].base,
-	      img_info_list[i].size,
+	      (uint64_t) img_info_list[i].base,
+	      (uint32_t) img_info_list[i].size,
 	      img_info_list[i].flag.needs_rebasing ? '*' : ' ');
     }
 }
@@ -981,7 +989,7 @@ rebase (const char *pathname, ULONG64 *new_image_base, BOOL down_flag)
 {
   ULONG64 old_image_base, prev_new_image_base;
   ULONG old_image_size, new_image_size;
-  BOOL status, status2;
+  BOOL status;
 
   /* Skip if not writable. */
   if (access (pathname, W_OK) == -1)
@@ -1001,56 +1009,56 @@ retry:
 
   /* Rebase the image. */
   prev_new_image_base = *new_image_base;
-  status = ReBaseImage64 ((char*) pathname,	/* CurrentImageName */
-			  "",			/* SymbolPath */
-			  TRUE,			/* fReBase */
-			  FALSE,		/* fRebaseSysfileOk */
-			  down_flag,		/* fGoingDown */
-			  0,			/* CheckImageSize */
-			  &old_image_size,	/* OldImageSize */
-			  &old_image_base,	/* OldImageBase */
-			  &new_image_size,	/* NewImageSize */
-			  new_image_base,	/* NewImageBase */
-			  time (0));		/* TimeStamp */
+  ReBaseImage64 ((char*) pathname,	/* CurrentImageName */
+		 "",			/* SymbolPath */
+		 TRUE,			/* fReBase */
+		 FALSE,		/* fRebaseSysfileOk */
+		 down_flag,		/* fGoingDown */
+		 0,			/* CheckImageSize */
+		 &old_image_size,	/* OldImageSize */
+		 &old_image_base,	/* OldImageBase */
+		 &new_image_size,	/* NewImageSize */
+		 new_image_base,	/* NewImageBase */
+		 time (0));		/* TimeStamp */
 
   /* MS's ReBaseImage seems to never return false! */
-  status2 = GetLastError ();
+  status = GetLastError ();
 
   /* If necessary, attempt to fix bad relocations. */
-  if (status2 == ERROR_INVALID_DATA)
+  if (status == ERROR_INVALID_DATA)
     {
       if (verbose)
 	fprintf (stderr, "%s: fixing bad relocations\n", pathname);
       BOOL status3 = FixImage ((char*) pathname);
       if (!status3)
 	{
-	  fprintf (stderr, "FixImage (%s) failed with last error = %lu\n",
-		   pathname, GetLastError ());
+	  fprintf (stderr, "FixImage (%s) failed with last error = %u\n",
+		   pathname, (uint32_t) GetLastError ());
 	  return FALSE;
 	}
 
       /* Retry rebase.*/
-      status = ReBaseImage64 ((char*) pathname,	/* CurrentImageName */
-			      "",		/* SymbolPath */
-			      TRUE,		/* fReBase */
-			      FALSE,		/* fRebaseSysfileOk */
-			      down_flag,	/* fGoingDown */
-			      0,		/* CheckImageSize */
-			      &old_image_size,	/* OldImageSize */
-			      &old_image_base,	/* OldImageBase */
-			      &new_image_size,	/* NewImageSize */
-			      new_image_base,	/* NewImageBase */
-			      time (0));	/* TimeStamp */
+      ReBaseImage64 ((char*) pathname,	/* CurrentImageName */
+		     "",		/* SymbolPath */
+		     TRUE,		/* fReBase */
+		     FALSE,		/* fRebaseSysfileOk */
+		     down_flag,	/* fGoingDown */
+		     0,		/* CheckImageSize */
+		     &old_image_size,	/* OldImageSize */
+		     &old_image_base,	/* OldImageBase */
+		     &new_image_size,	/* NewImageSize */
+		     new_image_base,	/* NewImageBase */
+		     time (0));	/* TimeStamp */
 
       /* MS's ReBaseImage seems to never return false! */
-      status2 = GetLastError ();
+      status = GetLastError ();
     }
 
   /* Check status of rebase. */
-  if (status2 != 0)
+  if (status != 0)
     {
-      fprintf (stderr, "ReBaseImage (%s) failed with last error = %lu\n",
-	       pathname, GetLastError ());
+      fprintf (stderr, "ReBaseImage (%s) failed with last error = %u\n",
+	       pathname, (uint32_t) GetLastError ());
       return FALSE;
     }
 
@@ -1070,10 +1078,10 @@ retry:
   /* Display rebase results, if verbose. */
   if (verbose)
     {
-      printf ("%s: new base = %" PRIx64 ", new size = %lx\n",
+      printf ("%s: new base = %" PRIx64 ", new size = %x\n",
 	      pathname,
-	      ((down_flag) ? *new_image_base : prev_new_image_base),
-	      new_image_size + offset);
+	      (uint64_t) ((down_flag) ? *new_image_base : prev_new_image_base),
+	      (uint32_t) new_image_size + offset);
     }
 
   /* Calculate next base address, if rebasing up. */
@@ -1196,7 +1204,7 @@ parse_args (int argc, char *argv[])
     {
       fprintf (stderr,
 	       "%s: Base address 0x%" PRIx64 " too big for 32 bit machines.\n",
-	       progname, image_base);
+	       progname, (uint64_t) image_base);
       exit (1);
     }
 

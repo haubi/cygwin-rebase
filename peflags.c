@@ -263,7 +263,7 @@ main (int argc, char *argv[])
   /* Operate on files in file list, if specified. */
   if (file_list)
     {
-      int status = 0, ret = 0;
+      int status = 0;
       char filename[MAX_PATH + 2];
       FILE *file = file_list_fopen (file_list);
 
@@ -461,8 +461,8 @@ do_mark (const char *pathname)
 		      printed_characteristic ? (int) strlen (pathname) + 2
 					     : 0, "",
 		      sizeof_vals[i].name,
-		      sizeof_vals[i].value,
-		      sizeof_vals[i].value,
+		      (uint64_t) sizeof_vals[i].value,
+		      (uint64_t) sizeof_vals[i].value,
 		      sizeof_vals[i].unit);
 	      printed_characteristic = TRUE;
 	    }

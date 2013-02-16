@@ -62,9 +62,9 @@ dump_rebasedb_header (FILE *f, img_info_hdr_t const *h)
       "  machine: %s\n"
       "  version: %d\n"
       "  base   : 0x%0*" PRIx64 "\n"
-      "  offset : 0x%08lx\n"
+      "  offset : 0x%08x\n"
       "  downflg: %s\n"
-      "  count  : %ld\n",
+      "  count  : %d\n",
       h->magic[0], h->magic[1], h->magic[2], h->magic[3],
       (h->machine == IMAGE_FILE_MACHINE_I386
       ? "i386"
@@ -73,10 +73,10 @@ dump_rebasedb_header (FILE *f, img_info_hdr_t const *h)
         : "unknown")),
       h->version,
       (h->machine == IMAGE_FILE_MACHINE_I386 ? 8 : 12),
-      h->base,
-      h->offset,
+      (uint64_t) h->base,
+      (uint32_t) h->offset,
       (h->down_flag ? "true" : "false"),
-      h->count);
+      (uint32_t) h->count);
 }
 
 void
@@ -95,13 +95,13 @@ dump_rebasedb_entry (FILE *f,
       return;
     }
   fprintf (f,
-      "%-*s base 0x%0*" PRIx64 " size 0x%08lx slot 0x%08lx %c\n",
+      "%-*s base 0x%0*" PRIx64 " size 0x%08x slot 0x%08x %c\n",
       h->machine == IMAGE_FILE_MACHINE_I386 ? 45 : 41,
       entry->name,
       h->machine == IMAGE_FILE_MACHINE_I386 ? 8 : 12,
-      entry->base,
-      entry->size,
-      entry->slot_size,
+      (uint64_t) entry->base,
+      (uint32_t) entry->size,
+      (uint32_t) entry->slot_size,
       entry->flag.needs_rebasing ? '*' : ' ');
 }
 

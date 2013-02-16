@@ -88,6 +88,15 @@ case $Platform in
     ;;
 esac
 
+# On x86_64 Cygwin, set DefaultAddressBase to 0x4:00000000
+case $Platform in
+  cygwin )
+    [ `uname -m` = "x86_64" ] && DefaultBaseAddress=0x400000000
+    ;;
+  * )
+    ;;
+esac
+  
 # Parse command line arguments
 while getopts "${ProgramOptions}" Option "$@"
 do

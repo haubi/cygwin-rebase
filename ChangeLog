@@ -1,3 +1,15 @@
+2013-02-16  Corinna Vinschen  <corinna@vinschen.de>
+
+	* peflags.c (main): Drop unused variable.
+	(do_mark): Add unambiguous casts to arguments of printf statement.
+	* rebase-db.c: Ditto, throughout.
+	* rebase-dump.c: Ditto, throughout.
+	* rebase.c: Ditto.
+	(main): Fix computation of 32 bit Cygwin DLL dead zone.  Handle x86_64
+	Cygwin as well.
+	(rebase): Remove unused variable.
+	* rebaseall.in: Take x86_64 Cygwin into account.
+
 2013-01-16  Jason Tishler  <jason@tishler.net>
 
 	Prepare for release 4.4.0.
