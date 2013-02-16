@@ -151,9 +151,9 @@ uint Exports::getVirtualAddress(char *symbol, uint *ordinal)
     return 0;
 
   int n = exports->NumberOfFunctions;
-  uint *p = (unsigned int *)((char *)exports->AddressOfFunctions + adjust);
-  char **s = (char **)((char *)exports->AddressOfNames + adjust);
-  ushort *o = (ushort *)((char *)exports->AddressOfNameOrdinals + adjust);
+  uint *p = (unsigned int *)((char *)adjust + exports->AddressOfFunctions);
+  char **s = (char **)((char *)adjust + exports->AddressOfNames);
+  ushort *o = (ushort *)((char *)adjust + exports->AddressOfNameOrdinals);
   for (int i = 0; i < n; i++,p++,s++)
     {
       if (strcmp(symbol,*s+adjust) == 0)
@@ -178,7 +178,7 @@ char *Exports::getNext(void)
 
   if (iterator < exports->NumberOfNames)
     {
-      char **s = (char **)((char *)exports->AddressOfNames + adjust);
+      char **s = (char **)((char *)adjust + exports->AddressOfNames);
       return (char *)(*(s+iterator++) + adjust);
     }
   else
@@ -186,7 +186,7 @@ char *Exports::getNext(void)
 }
 
 
-void Exports::dump(char *title)
+void Exports::dump(const char *title)
 {
 
   char *p;
@@ -241,7 +241,7 @@ ImportDescriptor *Imports::getNextDescriptor(void)
     return 0;
 }
 
-void Imports::dump(char *title)
+void Imports::dump(const char *title)
 {
   ImportDescriptor *p;
 
@@ -257,7 +257,7 @@ void Imports::dump(char *title)
       std::cout << std::setw(8) << std::setfill('0') << std::hex << p->OriginalFirstThunk << std::dec << " ";
       std::cout << std::setw(8) << std::setfill('0') << std::hex << p->TimeDateStamp << std::dec << "  ";
       std::cout << std::setw(8) << std::setfill('0') << std::hex << p->ForwarderChain << std::dec << " ";
-      std::cout << std::setw(8) << std::setfill('0') << std::hex << (void *)p->Name << std::dec << "  ";
+      std::cout << std::setw(8) << std::setfill('0') << std::hex << p->Name << std::dec << "  ";
       std::cout << std::setw(8) << std::setfill('0') << std::hex << p->FirstThunk << std::dec << std::endl;
 
     }

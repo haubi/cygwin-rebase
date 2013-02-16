@@ -1,3 +1,16 @@
+2013-02-16  Corinna Vinschen  <corinna@vinschen.de>
+
+	Throughout, tweak pointer expressions to use unambiguous cast
+	on all supported platforms.
+	* sections.cc (Exports::dump): Constify argument to avoid compiler
+	warning.
+	(Imports::dump): Ditto.
+	* sections.h (SectionBase::getAdjust): Change type to ptrdiff_t.
+	(SectionBase::adjust): Ditto.
+	(Exports::dump): Constify argument in declaration to avoid compiler
+	warning.
+	(Imports::dump): Ditto.
+
 2011-01-16  Jason Tishler  <jason@tishler.net>
 
 	Prepare for release 4.4.0.

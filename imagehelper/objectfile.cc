@@ -260,7 +260,7 @@ bool LinkedObjectFile::rebind(ObjectFileList &cache)
     {
       bool autoImportFlag;
       int *patch_address;
-      char *dllname = (char *)p->Name + idata->getAdjust();
+      char *dllname = (char *)idata->getAdjust() + p->Name;
       //  std::cerr << dllname << std::endl;
 
       if (!(obj = (LinkedObjectFile *)cache.get(dllname) ) )
@@ -408,7 +408,7 @@ bool LinkedObjectFile::PrintDependencies(ObjectFileList &cache)
   while ((p = imports->getNextDescriptor()) != NULL)
     {
       Section *sect = sections->find(p->Name);
-      char *dllname = (char *)p->Name + sect->getAdjust();
+      char *dllname = (char *)sect->getAdjust() + p->Name;
 
       if (!(obj = (LinkedObjectFile *)cache.get(dllname) ) )
         {

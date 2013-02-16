@@ -84,13 +84,13 @@ class Base
 class SectionBase : public Base
   {
   public:
-    int getAdjust()
+    ptrdiff_t getAdjust()
     {
       return adjust;
     }
 
   protected:
-    int adjust;
+    ptrdiff_t adjust;
   private:
   };
 
@@ -172,7 +172,7 @@ class Exports : SectionBase
     // return next exported name
     char *getNext(void);
 
-    void dump(char *title = "");
+    void dump(const char *title = "");
 
   private:
     ExportDirectory *exports;
@@ -190,7 +190,7 @@ class Imports : public SectionBase
     Imports(SectionList &sections, DataDirectory *iddp);
     void reset(void);
     ImportDescriptor *getNextDescriptor(void);
-    void dump(char *title = "");
+    void dump(const char *title = "");
 
   private:
     ImportDescriptor *imports;
