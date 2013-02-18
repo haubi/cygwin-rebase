@@ -47,7 +47,7 @@ usage()
 
 cleanup()
 {
-    rm -f "${TmpFile}"
+    rm -f "${TmpFile}" "${SortedFile}"
     exit ${ExitCode}
 }
 
@@ -204,7 +204,8 @@ then
 fi
 
 # Set temp file
-TmpFile="$TmpDir/rebase.lst"
+SortedFile="$TmpDir/rebase.lst"
+TmpFile="${SortedFile}.in"
 
 # Create rebase list
 case $Platform in
@@ -214,9 +215,20 @@ case $Platform in
       sed -e '/\/cygwin1\.dll$/d' -e '/\/cyglsa.*\.dll$/d' \
           -e '/sys-root\/mingw/d' -e 's/^/\//' \
           -e '/\/d\?ash\.exe$/d' -e '/\/rebase\.exe$/d' >"${TmpFile}"
-      # Unconditionally add the -n flag so rebased DLLs get the
-      # dynamicbase flag removed.
-      NoDyn='-n'
+    # some interpreters include a method for installing addons outside of the
+    # package manager, such as CPAN and RubyGems.
+    for d in /usr/lib/perl5/site_perl /usr/lib/py*/site-packages \
+             /usr/lib/php /usr/lib/R/site-library /usr/lib/rub*/gems \
+             /usr/lib/octave/site
+    do
+      if [ -d $d ]
+      then
+        find $d -type f | grep -E "\.($Suffixes)\$" >>"${TmpFile}"
+      fi
+    done
+    # Unconditionally add the -n flag so rebased DLLs get the
+    # dynamicbase flag removed.
+    NoDyn='-n'
     ;;
   mingw|msys)
     for f in /bin /lib
@@ -236,11 +248,14 @@ then
     cat "${FileList}" >>"${TmpFile}"
 fi
 
+# Remove duplicates
+sort -u "${TmpFile}" > "${SortedFile}"
+
 if [ -z "${BaseAddress}" ]
 then
-  rebase "${Verbose}" "${Touch}" "${NoDyn}" -s "${Mach}" -T "${TmpFile}"
+  rebase "${Verbose}" "${Touch}" "${NoDyn}" -s "${Mach}" -T "${SortedFile}"
 else
-  rebase "${Verbose}" "${Touch}" "${NoDyn}" -s "${Mach}" -b "${BaseAddress}" -o "${Offset}" -T "${TmpFile}"
+  rebase "${Verbose}" "${Touch}" "${NoDyn}" -s "${Mach}" -b "${BaseAddress}" -o "${Offset}" -T "${SortedFile}"
 fi
 ExitCode=$?
 
