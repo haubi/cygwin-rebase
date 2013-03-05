@@ -1,3 +1,7 @@
+2013-03-05  Corinna Vinschen  <corinna@vinschen.de>
+
+	* Makefile.in (install): Fix case of Todo file.
+
 2013-02-18  Yaakov Selkowitz  <yselkowitz@users.sourceforge.net>
 
 	* rebaseall.in: Remove duplicates from file list.

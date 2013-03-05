@@ -152,7 +152,7 @@ install: all
 	$(MKDIR_P) $(DESTDIR)$(docdir)
 	$(INSTALL_DATA) $(srcdir)/README $(DESTDIR)$(docdir)
 	$(INSTALL_DATA) $(srcdir)/NEWS $(DESTDIR)$(docdir)
-	$(INSTALL_DATA) $(srcdir)/ToDo $(DESTDIR)$(docdir)
+	$(INSTALL_DATA) $(srcdir)/Todo $(DESTDIR)$(docdir)
 	$(INSTALL_DATA) $(srcdir)/COPYING $(DESTDIR)$(docdir)
 
 # The source distribution is created by replicating the distributable
