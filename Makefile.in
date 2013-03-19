@@ -90,10 +90,10 @@ SRC_DISTFILES = configure.ac configure Makefile.in \
 	build-aux/install-sh getopt.h_ getopt_long.c \
 	rebase-db.c rebase-db.h rebase-dump.c strtoll.c
 
-all: libimagehelper rebase$(EXEEXT) rebase-dump$(EXEEXT) \
+all: $(LIBIMAGEHELPER) rebase$(EXEEXT) rebase-dump$(EXEEXT) \
   peflags$(EXEEXT) rebaseall peflagsall
 
-libimagehelper:
+$(LIBIMAGEHELPER):
 	$(MAKE) -C imagehelper imagehelper
 
 rebase$(EXEEXT): $(REBASE_LIBS) $(REBASE_OBJS)

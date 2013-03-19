@@ -1081,7 +1081,7 @@ retry:
       printf ("%s: new base = %" PRIx64 ", new size = %x\n",
 	      pathname,
 	      (uint64_t) ((down_flag) ? *new_image_base : prev_new_image_base),
-	      (uint32_t) new_image_size + offset);
+	      (uint32_t) (new_image_size + offset));
     }
 
   /* Calculate next base address, if rebasing up. */
