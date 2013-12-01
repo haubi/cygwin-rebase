@@ -861,6 +861,7 @@ collect_image_info (const char *pathname)
   img_info_list[img_info_size].slot_size
     = roundup2 (img_info_list[img_info_size].size, ALLOCATION_SLOT);
   img_info_list[img_info_size].flag.needs_rebasing = 1;
+  img_info_list[img_info_size].flag.cannot_rebase = 0;
   /* This back and forth from POSIX to Win32 is a way to get a full path
      more thoroughly.  For instance, the difference between /bin and
      /usr/bin will be eliminated. */

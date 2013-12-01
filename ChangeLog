@@ -1,3 +1,7 @@
+2013-12-01  David Stacey  <drstacey@tiscali.co.uk>
+
+	* rebase.c (collect_image_info): Initialize cannot_rebase flag to 0.
+
 2013-03-05  Corinna Vinschen  <corinna@vinschen.de>
 
 	* Makefile.in: Fix imagebase rule for parallel make.
