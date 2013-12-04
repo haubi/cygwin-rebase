@@ -1,3 +1,8 @@
+2013-12-03  Jason Tishler  <jason@tishler.net>
+
+	Prepare for release 4.4.1.
+	* configure.ac (AC_INIT): Bump version to 4.4.1.
+
 2013-12-01  David Stacey  <drstacey@tiscali.co.uk>
 
 	* rebase.c (collect_image_info): Initialize cannot_rebase flag to 0.
