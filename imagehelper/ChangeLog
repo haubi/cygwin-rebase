@@ -1,3 +1,11 @@
+2016-03-11  Corinna Vinschen  <corinna@vinschen.de>
+
+	* sections.h (SECTIONLIST_MAXSECTIONS): Remove.
+	(SectionList::sections): Convert to pointer.
+	* sections.cc (SectionList::SectionList): Allocate sections prior
+	to iterating over them.
+	(SectionList::~SectionList): Deallocate sections.
+
 2013-02-16  Corinna Vinschen  <corinna@vinschen.de>
 
 	Throughout, tweak pointer expressions to use unambiguous cast

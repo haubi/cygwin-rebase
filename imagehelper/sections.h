@@ -131,8 +131,6 @@ class Section : public SectionBase
     SectionHeader *header;
   };
 
-#define SECTIONLIST_MAXSECTIONS 50
-
 class SectionList : public Base
   {
   public:
@@ -152,7 +150,7 @@ class SectionList : public Base
   private:
     uintptr_t FileBase;
     SectionHeader *header;
-    Section *sections[SECTIONLIST_MAXSECTIONS];
+    Section **sections;
     int count;
     int iterator;
   };

@@ -86,6 +86,7 @@ SectionList::SectionList(void *aFileBase)
       header = (SectionHeader *) (ntheader32+1);
       count = ntheader32->FileHeader.NumberOfSections;
     }
+  sections = new Section*[count];
   for (int i = 0; i < count; i++)
     {
       sections[i] = new Section(aFileBase,&header[i]);
@@ -98,6 +99,7 @@ SectionList::~SectionList()
 {
   for (int i = 0; i < count; i++)
     delete sections[i];
+  delete sections;
 }
 
 Section *SectionList::find(const char *name)
