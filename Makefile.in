@@ -145,8 +145,8 @@ peflagsall: peflagsall.in
 
 install: all
 	$(MKDIR_P) $(DESTDIR)$(bindir)
-	$(INSTALL_PROGRAM) -s rebase$(EXEEXT) $(DESTDIR)$(bindir)
-	$(INSTALL_PROGRAM) -s peflags$(EXEEXT) $(DESTDIR)$(bindir)
+	$(INSTALL_PROGRAM) rebase$(EXEEXT) $(DESTDIR)$(bindir)
+	$(INSTALL_PROGRAM) peflags$(EXEEXT) $(DESTDIR)$(bindir)
 	$(INSTALL_SCRIPT) rebaseall $(DESTDIR)$(bindir)
 	$(INSTALL_SCRIPT) peflagsall $(DESTDIR)$(bindir)
 	$(MKDIR_P) $(DESTDIR)$(docdir)
