@@ -1,3 +1,7 @@
+DEPRECATED
+
+Use git log instead.
+
 2016-03-11  Corinna Vinschen  <corinna@vinschen.de>
 
 	* sections.h (SECTIONLIST_MAXSECTIONS): Remove.
