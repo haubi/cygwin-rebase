@@ -243,7 +243,8 @@ main (int argc, char *argv[])
       /* Rebase with database support. */
       BOOL header;
 
-      merge_image_info ();
+      if (merge_image_info () < 0)
+	return 2;
       status = TRUE;
       for (i = 0; i < img_info_size; ++i)
 	if (img_info_list[i].flag.needs_rebasing)
@@ -745,11 +746,20 @@ merge_image_info ()
       ULONG64 new_base;
 
       /* Skip trailing entries as long as there is no hole. */
-       while (img_info_list[end].base + img_info_list[end].slot_size + offset
-	     >= floating_image_base)
+       while (end > 0
+	      && img_info_list[end].base + img_info_list[end].slot_size
+		 + offset >= floating_image_base)
 	{
 	  floating_image_base = img_info_list[end].base;
 	  --end;
+	}
+      /* No hole?  We're in serious trouble! */
+      if (end <= 0)
+	{
+	  fprintf (stderr,
+		   "%s: Too many DLLs for available address space: %s\n",
+		   progname, strerror (ENOMEM));
+	  return -1;
 	}
       /* Test if one of the DLLs with address 0 fits into the hole. */
       for (i = 0, new_base = 0; img_info_list[i].base == 0; ++i, new_base = 0)
