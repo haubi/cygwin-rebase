@@ -67,6 +67,7 @@ WORD machine = IMAGE_FILE_MACHINE_AMD64;
 WORD machine = IMAGE_FILE_MACHINE_I386;
 #endif
 ULONG64 image_base = 0;
+ULONG64 low_addr;
 BOOL down_flag = FALSE;
 BOOL image_info_flag = FALSE;
 BOOL image_storage_flag = FALSE;
@@ -115,6 +116,30 @@ ULONG cygwin_dll_image_size = 0;
 #endif
 
 #define LONG_PATH_MAX 32768
+
+int
+check_base_address_sanity (ULONG64 addr, BOOL at_start)
+{
+#if defined(__CYGWIN__) || defined(__MSYS__)
+  /* Sanity checks for Cygwin:
+   *
+   * - No DLLs below 0x38000000 on 32 bit, W10 1703+ rebase those on
+   *   runtime anyway
+   * - No DLLs below 0x2:00000000, ever, on 64 bit.
+   */
+  if (addr <= low_addr)
+    {
+      if (at_start)
+	fprintf (stderr, "%s: Invalid Baseaddress 0x%" PRIx64 ", must be > 0x%" PRIx64 "\n",
+		 progname, (uint64_t) addr, (uint64_t) low_addr);
+      else
+	fprintf (stderr, "%s: Too many DLLs for available address space: %s\n",
+		 progname, strerror (ENOMEM));
+      return -1;
+    }
+#endif
+  return 0;
+}
 
 void
 gen_progname (const char *arg0)
@@ -753,19 +778,15 @@ merge_image_info ()
 	  floating_image_base = img_info_list[end].base;
 	  --end;
 	}
-      /* No hole?  We're in serious trouble! */
-      if (end < 0)
-	{
-	  fprintf (stderr,
-		   "%s: Too many DLLs for available address space: %s\n",
-		   progname, strerror (ENOMEM));
-	  return -1;
-	}
+
       /* Test if one of the DLLs with address 0 fits into the hole. */
       for (i = 0; img_info_list[i].base == 0; ++i)
 	{
 	  ULONG64 base = floating_image_base - img_info_list[i].slot_size
 		  - offset;
+	  /* Check if address is still valid */
+	  if (check_base_address_sanity (base, FALSE))
+	    return -1;
 	  if (base >= img_info_list[end].base + img_info_list[end].slot_size
 #if defined(__CYGWIN__) || defined(__MSYS__)
 	      /* Don't overlap the Cygwin/MSYS DLL. */
@@ -793,22 +814,18 @@ merge_image_info ()
 #if defined(__CYGWIN__) || defined(__MSYS__)
       if (floating_image_base >= cygwin_dll_image_base + cygwin_dll_image_size
 	  && img_info_list[end].base < cygwin_dll_image_base)
+	  floating_image_base = cygwin_dll_image_base;
+      else
+#endif
 	{
-	  if (machine == IMAGE_FILE_MACHINE_I386)
-	    floating_image_base = cygwin_dll_image_base;
-	  else /* No DLLs below Cygwin, ever, on 64 bit. */
+	  floating_image_base = img_info_list[end].base;
+	  if (--end < 0)
 	    {
 	      fprintf (stderr,
 		       "%s: Too many DLLs for available address space: %s\n",
 		       progname, strerror (ENOMEM));
 	      return -1;
 	    }
-	}
-      else
-#endif
-	{
-	  floating_image_base = img_info_list[end].base;
-	  --end;
 	}
     }
 
@@ -1230,6 +1247,16 @@ parse_args (int argc, char *argv[])
 	       progname, (uint64_t) image_base);
       exit (1);
     }
+
+  /* The low address for 32 bit is extremly low, and apparently
+     W10 1703 and later rebase all DLLs with start addresses < 0x38000000
+     at runtime.  However, we have so many DLLs that a hardcoded lowest
+     address of 0x38000000 is just not feasible. */
+  low_addr = (machine == IMAGE_FILE_MACHINE_I386) ? 0x001000000ULL
+						  : 0x200000000ULL;
+
+  if (image_base && check_base_address_sanity (image_base, TRUE) < 0)
+    exit (1);
 
   args_index = optind;
 
