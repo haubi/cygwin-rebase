@@ -754,7 +754,7 @@ merge_image_info ()
 	  --end;
 	}
       /* No hole?  We're in serious trouble! */
-      if (end <= 0)
+      if (end < 0)
 	{
 	  fprintf (stderr,
 		   "%s: Too many DLLs for available address space: %s\n",
@@ -793,7 +793,17 @@ merge_image_info ()
 #if defined(__CYGWIN__) || defined(__MSYS__)
       if (floating_image_base >= cygwin_dll_image_base + cygwin_dll_image_size
 	  && img_info_list[end].base < cygwin_dll_image_base)
-	floating_image_base = cygwin_dll_image_base;
+	{
+	  if (machine == IMAGE_FILE_MACHINE_I386)
+	    floating_image_base = cygwin_dll_image_base;
+	  else /* No DLLs below Cygwin, ever, on 64 bit. */
+	    {
+	      fprintf (stderr,
+		       "%s: Too many DLLs for available address space: %s\n",
+		       progname, strerror (ENOMEM));
+	      return -1;
+	    }
+	}
       else
 #endif
 	{
