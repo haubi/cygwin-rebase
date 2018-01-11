@@ -743,7 +743,7 @@ merge_image_info ()
   end = img_info_size - 1;
   while (img_info_list[0].base == 0)
     {
-      ULONG64 new_base;
+      ULONG64 new_base = 0;
 
       /* Skip trailing entries as long as there is no hole. */
        while (end > 0
@@ -762,19 +762,21 @@ merge_image_info ()
 	  return -1;
 	}
       /* Test if one of the DLLs with address 0 fits into the hole. */
-      for (i = 0, new_base = 0; img_info_list[i].base == 0; ++i, new_base = 0)
+      for (i = 0; img_info_list[i].base == 0; ++i)
 	{
-	  new_base = floating_image_base - img_info_list[i].slot_size - offset;
-	  if (new_base >= img_info_list[end].base
-			  + img_info_list[end].slot_size
+	  ULONG64 base = floating_image_base - img_info_list[i].slot_size
+		  - offset;
+	  if (base >= img_info_list[end].base + img_info_list[end].slot_size
 #if defined(__CYGWIN__) || defined(__MSYS__)
 	      /* Don't overlap the Cygwin/MSYS DLL. */
-	      && (new_base >= cygwin_dll_image_base + cygwin_dll_image_size
-		  || new_base + img_info_list[i].slot_size
-		     <= cygwin_dll_image_base)
+	      && (base >= cygwin_dll_image_base + cygwin_dll_image_size
+		  || base + img_info_list[i].slot_size <= cygwin_dll_image_base)
 #endif
 	     )
-	    break;
+	    {
+	      new_base = base;
+	      break;
+	    }
 	}
       /* Found a match.  Mount into list. */
       if (new_base)
