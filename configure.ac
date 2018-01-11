@@ -2,7 +2,7 @@
 # configure.ac for rebase
 
 AC_PREREQ([2.64])
-AC_INIT([rebase], [4.4.3], [cygwin@cygwin.com])
+AC_INIT([rebase], [4.4.4], [cygwin@cygwin.com])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_SRCDIR([peflags.c])
 AC_PREFIX_DEFAULT([/usr])
