@@ -749,7 +749,7 @@ merge_image_info ()
 	  /* However, if the DLL got bigger and doesn't fit into its slot
 	     anymore, rebase this DLL from scratch. */
 	  if (i + 1 < img_info_rebase_start
-	      && cur_base + slot_size + offset >= img_info_list[i + 1].base)
+	      && cur_base + slot_size + offset > img_info_list[i + 1].base)
 	    {
 	      img_info_list[i].base = 0;
 	      if (verbose)
@@ -758,7 +758,7 @@ merge_image_info ()
 	  /* Does the previous DLL reach into the address space of this
 	     DLL?  This happens if the previous DLL is not rebaseable. */
 	  else if (i > 0 && cur_base < img_info_list[i - 1].base
-				       + img_info_list[i + 1].slot_size)
+				       + img_info_list[i - 1].slot_size)
 	    {
 	      img_info_list[i].base = 0;
 	      if (verbose)
@@ -766,7 +766,7 @@ merge_image_info ()
 	    }
 	  /* Does the file match the base address requirements?  If not,
 	     rebase from scratch. */
-	  else if ((down_flag && cur_base + slot_size + offset >= image_base)
+	  else if ((down_flag && cur_base + slot_size + offset > image_base)
 		   || (!down_flag && cur_base < image_base))
 	    {
 	      img_info_list[i].base = 0;
