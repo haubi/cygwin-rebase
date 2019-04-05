@@ -79,6 +79,8 @@ BOOL verbose = FALSE;
 BOOL quiet = FALSE;
 const char *file_list = 0;
 const char *stdin_file_list = "-";
+const char *destdir = 0;
+size_t destdir_len = 0;
 
 const char *progname;
 
@@ -116,6 +118,25 @@ ULONG cygwin_dll_image_size = 0;
 #endif
 
 #define LONG_PATH_MAX 32768
+
+char * realname (img_info_t *img)
+{
+  /* realname eventually contains DESTDIR */
+  return img->name + img->name_size;
+}
+
+BOOL has_destdir(const char * pathname)
+{
+  if (!destdir)
+    return FALSE;
+  /* must start with DESTDIR */
+  if (strncmp (pathname, destdir, destdir_len))
+    return FALSE;
+  /* followed by a path separator */
+  if (pathname[destdir_len] != '/')
+    return FALSE;
+  return TRUE;
+}
 
 int
 check_base_address_sanity (ULONG64 addr, BOOL at_start)
@@ -258,7 +279,8 @@ main (int argc, char *argv[])
       ULONG64 new_image_base = image_base;
       for (i = 0; i < img_info_size; ++i)
 	{
-	  status = rebase (img_info_list[i].name, &new_image_base, down_flag);
+	  status = rebase (realname (&img_info_list[i]),
+			   &new_image_base, down_flag);
 	  if (!status)
 	    return 2;
 	}
@@ -275,7 +297,8 @@ main (int argc, char *argv[])
 	if (img_info_list[i].flag.needs_rebasing)
 	  {
 	    ULONG64 new_image_base = img_info_list[i].base;
-	    status = rebase (img_info_list[i].name, &new_image_base, FALSE);
+	    status = rebase (realname (&img_info_list[i]),
+			     &new_image_base, FALSE);
 	    if (status)
 	      img_info_list[i].flag.needs_rebasing = 0;
 	  }
@@ -288,7 +311,7 @@ main (int argc, char *argv[])
 		       "because they were in use:\n", stderr);
 		header = TRUE;
 	      }
-	    fprintf (stderr, "  %s\n", img_info_list[i].name);
+	    fprintf (stderr, "  %s\n", realname (&img_info_list[i]));
 	  }
       for (header = FALSE, i = 0; i < img_info_size; ++i)
 	if (img_info_list[i].flag.needs_rebasing)
@@ -299,7 +322,7 @@ main (int argc, char *argv[])
 		       "due to errors:\n", stderr);
 		header = TRUE;
 	      }
-	    fprintf (stderr, "  %s\n", img_info_list[i].name);
+	    fprintf (stderr, "  %s\n", realname (&img_info_list[i]));
 	  }
       if (save_image_info () < 0)
 	return 2;
@@ -370,7 +393,7 @@ save_image_info ()
     {
       int i;
 
-      /* Write all strings. */
+      /* Write all strings, without the optional DESTDIR part. */
       for (i = 0; i < img_info_size; ++i)
 	if (write (fd, img_info_list[i].name,
 		   strlen (img_info_list[i].name) + 1) < 0)
@@ -534,8 +557,8 @@ load_image_info ()
 	img_info_list[i].name = NULL;
 	/* Ensure that existing database entries are not touched when
 	 *  --oblivious is active, even if they are out-of sync with
-	 *  reality. */
-	if (image_oblivious_flag)
+	 *  reality.  This also applies to when using DESTDIR. */
+	if (image_oblivious_flag || destdir)
 	  img_info_list[i].flag.cannot_rebase = 2;
       }
   /* Eventually read the strings. */
@@ -543,8 +566,9 @@ load_image_info ()
     {
       for (i = 0; i < img_info_size; ++i)
 	{
+	  /* provide realname even if identical to name */
 	  img_info_list[i].name = (char *)
-				  malloc (img_info_list[i].name_size);
+				  malloc (img_info_list[i].name_size * 2);
 	  if (!img_info_list[i].name)
 	    {
 	      fprintf (stderr, "%s: Out of memory.\n", progname);
@@ -565,6 +589,7 @@ load_image_info ()
 	      ret = -1;
 	      break;
 	    }
+	  strcpy (realname (&img_info_list[i]), img_info_list[i].name);
 	}
     }
   close (fd);
@@ -584,11 +609,11 @@ load_image_info ()
 static BOOL
 set_cannot_rebase (img_info_t *img)
 {
-  /* While --oblivious is active, cannot_rebase is set to 2 on loading
-   * the database entries */
+  /* While --oblivious or DESTDIR is active,
+   * cannot_rebase is set to 2 on loading the database entries */
   if (img->flag.cannot_rebase <= 1 )
     {
-      int fd = open (img->name, O_WRONLY);
+      int fd = open (realname (img), O_WRONLY);
       if (fd < 0)
 	img->flag.cannot_rebase = 1;
       else
@@ -652,10 +677,12 @@ merge_image_info ()
 		    {
 		      match->base = 0;
 		      if (verbose)
-		        fprintf (stderr, "rebasing %s because it won't fit in it's old slot size\n", img_info_list[i].name);
+		        fprintf (stderr, "rebasing %s because it won't fit in it's old slot size\n",
+				 realname (&img_info_list[i]));
 		    }
 		  else if (verbose)
-		    fprintf (stderr, "rebasing %s because it's not located at it's old slot\n", img_info_list[i].name);
+		    fprintf (stderr, "rebasing %s because it's not located at it's old slot\n",
+			     realname (&img_info_list[i]));
 
 		  match->flag.needs_rebasing = 1;
 		}
@@ -669,9 +696,12 @@ merge_image_info ()
 		fprintf (stderr, "%s: oblivious file \"%s\" already "
 			 "found in rebase database "
 			 "(file and database kept unchanged).\n",
-			 progname, img_info_list[i].name);
+			 progname, realname (&img_info_list[i]));
+	      /* Use new file name, as it may carry DESTDIR. */
+	      free (match->name);
+	      match->name = img_info_list[i].name;
+	      match->name_size = img_info_list[i].name_size;
 	      /* Remove new entry from array. */
-	      free (img_info_list[i].name);
 	      img_info_list[i--] = img_info_list[--img_info_size];
 	    }
 	  else if (!img_info_list[i].flag.cannot_rebase)
@@ -679,7 +709,8 @@ merge_image_info ()
 	      /* Not in database yet.  Set base to 0 to choose a new one. */
 	      img_info_list[i].base = 0;
 	      if (verbose)
-		fprintf (stderr, "rebasing %s because not in database yet\n", img_info_list[i].name);
+		fprintf (stderr, "rebasing %s because not in database yet\n",
+			 realname (&img_info_list[i]));
 	    }
 	}
     }
@@ -696,7 +727,8 @@ merge_image_info ()
 	    {
 	      img_info_list[i].base = 0;
 	      if (verbose)
-		fprintf (stderr, "rebasing %s because forced or database missing\n", img_info_list[i].name);
+		fprintf (stderr, "rebasing %s because forced or database missing\n",
+			 realname (&img_info_list[i]));
 	    }
 	}
       img_info_rebase_start = 0;
@@ -742,7 +774,8 @@ merge_image_info ()
 	    {
 	      img_info_list[i].flag.needs_rebasing = 1;
 	      if (verbose)
-		fprintf (stderr, "rebasing %s because it's base has changed (due to being reinstalled?)\n", img_info_list[i].name);
+		fprintf (stderr, "rebasing %s because it's base has changed (due to being reinstalled?)\n",
+			 realname (&img_info_list[i]));
 	      /* Set cur_base to the old base to simplify subsequent tests. */
 	      cur_base = img_info_list[i].base;
 	    }
@@ -753,7 +786,8 @@ merge_image_info ()
 	    {
 	      img_info_list[i].base = 0;
 	      if (verbose)
-		fprintf (stderr, "rebasing %s because it won't fit in it's old slot without overlapping next DLL\n", img_info_list[i].name);
+		fprintf (stderr, "rebasing %s because it won't fit in it's old slot without overlapping next DLL\n",
+			 realname (&img_info_list[i]));
 	    }
 	  /* Does the previous DLL reach into the address space of this
 	     DLL?  This happens if the previous DLL is not rebaseable. */
@@ -762,7 +796,8 @@ merge_image_info ()
 	    {
 	      img_info_list[i].base = 0;
 	      if (verbose)
-		fprintf (stderr, "rebasing %s because previous DLL now overlaps\n", img_info_list[i].name);
+		fprintf (stderr, "rebasing %s because previous DLL now overlaps\n",
+			 realname (&img_info_list[i]));
 	    }
 	  /* Does the file match the base address requirements?  If not,
 	     rebase from scratch. */
@@ -771,7 +806,8 @@ merge_image_info ()
 	    {
 	      img_info_list[i].base = 0;
 	      if (verbose)
-		fprintf (stderr, "rebasing %s because it's base address is outside the expected area\n", img_info_list[i].name);
+		fprintf (stderr, "rebasing %s because it's base address is outside the expected area\n",
+			 realname (&img_info_list[i]));
 	    }
 	}
       /* Unconditionally overwrite old with new size. */
@@ -866,6 +902,21 @@ collect_image_info (const char *pathname)
 {
   BOOL ret;
   WORD dll_machine;
+  const char *pathname_for_db = pathname;
+  PCHAR tmp_pathname;
+
+  if (destdir)
+    {
+      /* If we operate with DESTDIR, only accept dll files from DESTDIR. */
+      if (!has_destdir(pathname))
+	{
+	  fprintf(stderr, "%s: Path name does not match --destdir argument.",
+		  pathname);
+	  return FALSE;
+	}
+      /* But never store DESTDIR in database. */
+      pathname_for_db += destdir_len;
+    }
 
   /* Skip if file does not exist to prevent ReBaseImage() from using it's
      stupid search algorithm (e.g, PATH, etc.). */
@@ -937,40 +988,71 @@ collect_image_info (const char *pathname)
   {
     char w32_path[MAX_PATH];
     char full_path[MAX_PATH];
-    cygwin_conv_to_full_win32_path (pathname, w32_path);
+    cygwin_conv_to_full_win32_path (pathname_for_db, w32_path);
     cygwin_conv_to_full_posix_path (w32_path, full_path);
-    img_info_list[img_info_size].name = strdup (full_path);
     img_info_list[img_info_size].name_size = strlen (full_path) + 1;
-  }
-#elif defined (__CYGWIN__)
-  {
-    PWSTR w32_path = cygwin_create_path (CCP_POSIX_TO_WIN_W, pathname);
-    if (!w32_path)
-      {
-	fprintf (stderr, "%s: Out of memory.\n", progname);
-	return FALSE;
-      }
+    /* allocate for realname at name+name_size */
     img_info_list[img_info_size].name
-      = cygwin_create_path (CCP_WIN_W_TO_POSIX, w32_path);
+      = (char*) malloc (img_info_list[img_info_size].name_size +
+		        strlen (pathname) + 1);
     if (!img_info_list[img_info_size].name)
       {
 	fprintf (stderr, "%s: Out of memory.\n", progname);
 	return FALSE;
       }
+    strcpy(img_info_list[img_info_size].name, full_path);
+    strcpy (realname (&img_info_list[img_info_size]), pathname);
+  }
+#elif defined (__CYGWIN__)
+  {
+    PWSTR w32_path = cygwin_create_path (CCP_POSIX_TO_WIN_W, pathname_for_db);
+    if (!w32_path)
+      {
+	fprintf (stderr, "%s: Out of memory.\n", progname);
+	return FALSE;
+      }
+    tmp_pathname = cygwin_create_path (CCP_WIN_W_TO_POSIX, w32_path);
+    if (!tmp_pathname)
+      {
+	fprintf (stderr, "%s: Out of memory.\n", progname);
+	return FALSE;
+      }
+    img_info_list[img_info_size].name_size = strlen (tmp_pathname) + 1;
+    /* allocate for realname at name+name_size */
+    img_info_list[img_info_size].name
+      = (char*) malloc (img_info_list[img_info_size].name_size +
+                        strlen (pathname) + 1);
+    if (!img_info_list[img_info_size].name)
+      {
+	fprintf (stderr, "%s: Out of memory.\n", progname);
+	return FALSE;
+      }
+    strcpy (img_info_list[img_info_size].name, tmp_pathname);
+    free (tmp_pathname);
     free (w32_path);
-    img_info_list[img_info_size].name_size
-      = strlen (img_info_list[img_info_size].name) + 1;
+    strcpy (realname (&img_info_list[img_info_size]), pathname);
   }
 #else
   {
     char full_path[MAX_PATH];
-    GetFullPathName (pathname, MAX_PATH, full_path, NULL);
-    img_info_list[img_info_size].name = strdup (full_path);
+    GetFullPathName (pathname_for_db, MAX_PATH, full_path, NULL);
     img_info_list[img_info_size].name_size = strlen (full_path) + 1;
+    /* allocate for realname at name+name_size */
+    img_info_list[img_info_size].name
+      = (char*) malloc (img_info_list[img_info_size].name_size +
+		        strlen (pathname) + 1);
+    if (!img_info_list[img_info_size].name)
+      {
+	fprintf (stderr, "%s: Out of memory.\n", progname);
+	return FALSE;
+      }
+    strcpy (img_info_list[img_info_size].name, full_path);
+    strcpy (realname (&img_info_list[img_info_size]), pathname);
   }
 #endif
   if (verbose)
-    fprintf (stderr, "rebasing %s because filename given on command line\n", img_info_list[img_info_size].name);
+    fprintf (stderr, "rebasing %s because filename given on command line\n",
+	     realname (&img_info_list[img_info_size]));
   ++img_info_size;
   return TRUE;
 }
@@ -1018,7 +1100,7 @@ print_image_info ()
 	  ULONG64 base;
 	  ULONG size;
 
-	  if (GetImageInfos64 (img_info_list[i].name, NULL, &base, &size))
+	  if (GetImageInfos64 (realname (&img_info_list[i]), NULL, &base, &size))
 	    {
 	      img_info_list[i].base = base;
 	      img_info_list[i].size = size;
@@ -1047,7 +1129,7 @@ print_image_info ()
 	}
       printf ("%-*s base 0x%0*" PRIx64 " size 0x%08x %c\n",
 	      name_width,
-	      img_info_list[i].name,
+	      realname (&img_info_list[i]),
 	      machine == IMAGE_FILE_MACHINE_I386 ? 8 : 12,
 	      (uint64_t) img_info_list[i].base,
 	      (uint32_t) img_info_list[i].size,
@@ -1166,6 +1248,7 @@ static struct option long_options[] = {
   {"32",	no_argument,	   NULL, '4'},
   {"64",	no_argument,	   NULL, '8'},
   {"base",	required_argument, NULL, 'b'},
+  {"destdir",	required_argument, NULL, 'D'},
   {"down",	no_argument,	   NULL, 'd'},
   {"help",	no_argument,	   NULL, 'h'},
   {"usage",	no_argument,	   NULL, 'h'},
@@ -1182,7 +1265,7 @@ static struct option long_options[] = {
   {NULL,	no_argument,	   NULL,  0 }
 };
 
-static const char *short_options = "48b:dhino:OqstT:vV";
+static const char *short_options = "48b:D:dhino:OqstT:vV";
 
 void
 parse_args (int argc, char *argv[])
@@ -1206,6 +1289,10 @@ parse_args (int argc, char *argv[])
 	case 'b':
 	  image_base = string_to_ulonglong (optarg);
 	  force_rebase_flag = TRUE;
+	  break;
+	case 'D':
+	  destdir = optarg;
+	  destdir_len = strlen(destdir);
 	  break;
 	case 'd':
 	  down_flag = TRUE;
@@ -1265,6 +1352,7 @@ parse_args (int argc, char *argv[])
     }
 
   if ((image_base == 0 && !image_info_flag && !image_storage_flag)
+      || (destdir && !image_storage_flag)
       || (image_base && image_info_flag))
     {
       usage ();
@@ -1367,7 +1455,7 @@ void
 usage ()
 {
   fprintf (stderr,
-"usage: %s [-b BaseAddress] [-o Offset] [-48dOsvV]"
+"usage: %s [-b BaseAddress] [-o Offset] [-D destdir] [-48dOsvV]"
 " [-T [FileList | -]] Files...\n"
 "       %s -i [-48Os] [-T [FileList | -]] Files...\n"
 "       %s --help or --usage for full help text\n",
@@ -1420,6 +1508,10 @@ Rebase PE files, usually DLLs, to a specified address or address range.\n\
                           Usually rebase does not change the file's time.\n\
   -T, --filelist=FILE     Also rebase the files specified in FILE.  The format\n\
                           of FILE is one DLL per line.\n\
+  -D, --destdir=DESTDIR   Files to be rebased are in staging directory DESTDIR.\n\
+                          Record them to the database without DESTDIR, they may\n\
+                          be moved there without running rebase again.\n\
+                          (Requires -s).\n\
   -q, --quiet             Be quiet about non-critical issues.\n\
   -v, --verbose           Print some debug output.\n\
   -V, --version           Print version info and exit.\n\

@@ -58,6 +58,8 @@ typedef struct _img_info
     PCHAR   name;	/* Absolute path to DLL.  The strings are stored     */
     ULONG64 _filler;	/* right after the img_info_t table, in the same     */
   };			/* order as the img_info_t entries.                  */
+			/* In memory, the real path name (probably starting  */
+			/* with DESTDIR) is at name + name_size.             */
   ULONG   name_size;	/* Length of name string including trailing NUL.     */
   ULONG64 base;		/* Base address the DLL has been rebased to.         */
   ULONG   size;		/* Size of the DLL at rebased time.                  */
