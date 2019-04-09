@@ -1441,7 +1441,7 @@ is_rebaseable (const char *pathname)
 
   fd = open (pathname, O_RDONLY);
   if (fd == -1)
-    goto done;
+    return status;
 
   offset = lseek (fd, pe_signature_offset_offset, SEEK_SET);
   if (offset == -1)
