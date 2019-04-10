@@ -1,4 +1,4 @@
-#!/bin/@ASH@
+#!@POSIXSHELL@
 
 #
 # Copyright (c) 2009,2011 Charles Wilson

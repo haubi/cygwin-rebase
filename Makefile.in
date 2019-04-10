@@ -53,7 +53,7 @@ LN_S = @LN_S@
 SED = @SED@
 EGREP = @EGREP@
 FGREP = @FGREP@
-ASH = @ASH@
+POSIXSHELL = @POSIXSHELL@
 
 DEFAULT_INCLUDES = -I. -I$(srcdir) -I$(srcdir)/imagehelper
 DEFS = @DEFS@ -DVERSION='"$(PACKAGE_VERSION)"' -DLIB_VERSION='"$(LIB_VERSION)"' -DSYSCONFDIR='"$(sysconfdir)"'
@@ -128,7 +128,7 @@ edit = sed \
 	-e 's|@pkgdatadir[@]|$(pkgdatadir)|g' \
 	-e 's|@prefix[@]|$(prefix)|g' \
 	-e 's|@exec_prefix[@]|$(exec_prefix)|g' \
-	-e 's|@ASH[@]|$(ASH)|g' \
+	-e 's|@POSIXSHELL[@]|$(POSIXSHELL)|g' \
 	-e 's|@DEFAULT_OFFSET_VALUE[@]|$(DEFAULT_OFFSET_VALUE)|g'
 
 rebaseall peflagsall: Makefile
