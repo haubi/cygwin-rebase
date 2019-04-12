@@ -72,6 +72,7 @@ BOOL down_flag = FALSE;
 BOOL image_info_flag = FALSE;
 BOOL image_storage_flag = FALSE;
 BOOL image_oblivious_flag = FALSE;
+BOOL perform_rebase_flag = TRUE;
 BOOL force_rebase_flag = FALSE;
 ULONG offset = 0;
 int args_index = 0;
@@ -533,9 +534,9 @@ load_image_info ()
       {
 	img_info_list[i].name = NULL;
 	/* Ensure that existing database entries are not touched when
-	 *  --oblivious is active, even if they are out-of sync with
-	 *  reality. */
-	if (image_oblivious_flag)
+	 *  --oblivious or --update is active, even if they are
+	 *  out-of sync with reality. */
+	if (image_oblivious_flag || !perform_rebase_flag)
 	  img_info_list[i].flag.cannot_rebase = 2;
       }
   /* Eventually read the strings. */
@@ -584,8 +585,8 @@ load_image_info ()
 static BOOL
 set_cannot_rebase (img_info_t *img)
 {
-  /* While --oblivious is active, cannot_rebase is set to 2 on loading
-   * the database entries */
+  /* While --oblivious or --update is active, cannot_rebase
+   * is set to 2 on loading the database entries */
   if (img->flag.cannot_rebase <= 1 )
     {
       int fd = open (img->name, O_WRONLY);
@@ -878,7 +879,7 @@ collect_image_info (const char *pathname)
 
   /* Skip if not rebaseable, but only if we're collecting for rebasing,
      not if we're collecting for printing only. */
-  if (!image_info_flag && !is_rebaseable (pathname))
+  if (perform_rebase_flag && !is_rebaseable (pathname))
     {
       if (!quiet)
 	fprintf (stderr, "%s: skipped because not rebaseable\n", pathname);
@@ -928,8 +929,16 @@ collect_image_info (const char *pathname)
     }
   img_info_list[img_info_size].slot_size
     = roundup2 (img_info_list[img_info_size].size, ALLOCATION_SLOT);
-  img_info_list[img_info_size].flag.needs_rebasing = 1;
-  img_info_list[img_info_size].flag.cannot_rebase = 0;
+  if (perform_rebase_flag)
+    {
+      img_info_list[img_info_size].flag.needs_rebasing = 1;
+      img_info_list[img_info_size].flag.cannot_rebase = 0;
+    }
+  else
+    {
+      img_info_list[img_info_size].flag.needs_rebasing = 0;
+      img_info_list[img_info_size].flag.cannot_rebase = 2;
+    }
   /* This back and forth from POSIX to Win32 is a way to get a full path
      more thoroughly.  For instance, the difference between /bin and
      /usr/bin will be eliminated. */
@@ -970,7 +979,9 @@ collect_image_info (const char *pathname)
   }
 #endif
   if (verbose)
-    fprintf (stderr, "rebasing %s because filename given on command line\n", img_info_list[img_info_size].name);
+    fprintf (stderr, "%s %s because filename given on command line\n",
+	     perform_rebase_flag ? "rebasing" : "considering",
+	     img_info_list[img_info_size].name);
   ++img_info_size;
   return TRUE;
 }
@@ -1175,6 +1186,7 @@ static struct option long_options[] = {
   {"quiet",	no_argument,	   NULL, 'q'},
   {"database",	no_argument,	   NULL, 's'},
   {"touch",	no_argument,	   NULL, 't'},
+  {"update",	no_argument,	   NULL, 'U'},
   {"filelist",	required_argument, NULL, 'T'},
   {"no-dynamicbase", no_argument,  NULL, 'n'},
   {"verbose",	no_argument,	   NULL, 'v'},
@@ -1182,7 +1194,7 @@ static struct option long_options[] = {
   {NULL,	no_argument,	   NULL,  0 }
 };
 
-static const char *short_options = "48b:dhino:OqstT:vV";
+static const char *short_options = "48b:dhiMno:OqstT:vV";
 
 void
 parse_args (int argc, char *argv[])
@@ -1212,6 +1224,7 @@ parse_args (int argc, char *argv[])
 	  break;
 	case 'i':
 	  image_info_flag = TRUE;
+	  perform_rebase_flag = FALSE;
 	  break;
 	case 'o':
 	  offset = string_to_ulonglong (optarg);
@@ -1219,6 +1232,10 @@ parse_args (int argc, char *argv[])
 	  break;
 	case 'q':
 	  quiet = TRUE;
+	  break;
+	case 'U':
+	  perform_rebase_flag = FALSE;
+	  image_storage_flag = TRUE;
 	  break;
 	case 'O':
 	  image_oblivious_flag = TRUE;
@@ -1264,8 +1281,8 @@ parse_args (int argc, char *argv[])
 	}
     }
 
-  if ((image_base == 0 && !image_info_flag && !image_storage_flag)
-      || (image_base && image_info_flag))
+  if ((image_base == 0 && perform_rebase_flag && !image_storage_flag)
+      || (force_rebase_flag && !perform_rebase_flag))
     {
       usage ();
       exit (1);
@@ -1399,11 +1416,16 @@ Rebase PE files, usually DLLs, to a specified address or address range.\n\
   -O, --oblivious         Do not change any files already in the database\n\
                           and do not record any changes to the database.\n\
                           (Implies -s).\n\
+  -U, --update            Do not perform any rebase, update the database only.\n\
+                          Implies -s, incompatible with -b and -o.\n\
+                          The files listed should have been rebased just before\n\
+                          using the -O flag (maybe in some staging directory).\n\
   -i, --info              Rather then rebasing, just print the current base\n\
                           address and size of the files.  With -s, use the\n\
                           database.  The files are ordered by base address.\n\
                           A '*' at the end of the line is printed if a\n\
                           collisions with an adjacent file is detected.\n\
+                          Incompatible with -b and -o.\n\
 \n\
   One of the options -b, -s or -i is mandatory.  If no rebase database exists\n\
   yet, -b is required together with -s.\n\
